@@ -6,7 +6,7 @@
 
    Modified by arjenhiemstra:
    Complete rework of the itho packet section, cleanup and easier to understand
-   Library structure is preserved, should be a drop in replacement (apart from device id) 
+   Library structure is preserved, should be a drop in replacement (apart from device id)
    Decode incoming messages to direct usable decimals without further bit-shifting
    DeviceID is now 3 bytes long and can be set during runtime
    Counter2 is the decimal sum of all bytes in decoded form from deviceType up to the last byte before counter2 subtracted from zero.
@@ -15,8 +15,8 @@
    Trigger on the falling edge and simplified ISR routine for more robust packet handling
    Move SYNC word from 171,170 further down the message to 179,42,163,42 to filter out more non-itho messages in CC1101 hardware
    Check validity of incoming message
-   
-   Tested on ESP8266 & ESP32   
+
+   Tested on ESP8266 & ESP32
 */
 
 /*

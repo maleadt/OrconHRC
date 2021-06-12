@@ -297,7 +297,7 @@ bool IthoCC1101::parseMessageCommand() {
   inIthoPacket.deviceId[0] = inIthoPacket.dataDecoded[1];
   inIthoPacket.deviceId[1] = inIthoPacket.dataDecoded[2];
   inIthoPacket.deviceId[2] = inIthoPacket.dataDecoded[3];
-  
+
   //counter1
   inIthoPacket.counter = inIthoPacket.dataDecoded[4];
 
@@ -354,7 +354,7 @@ bool IthoCC1101::parseMessageCommand() {
     return false;
   }
 #endif
-  
+
   return true;
 }
 
@@ -709,12 +709,12 @@ uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
 
 
 void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
-  
+
   itho->length = 0;
   int lenInbuf = packet->length;
 
   lenInbuf -= STARTBYTE; //correct for sync byte pos
-  
+
   while (lenInbuf >= 5) {
     lenInbuf -= 5;
     itho->length += 2;
@@ -729,7 +729,7 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
   for (int i = 0; i < sizeof(itho->dataDecodedChk) / sizeof(itho->dataDecodedChk[0]); i++) {
     itho->dataDecodedChk[i] = 0;
   }
-  
+
   uint8_t out_i = 0;                                  //byte index
   uint8_t out_j = 4;                                  //bit index
   uint8_t out_i_chk = 0;                              //byte index
@@ -761,7 +761,7 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
           itho->dataDecodedChk[out_i_chk] = ~itho->dataDecodedChk[out_i_chk]; //inverse bits
           out_i_chk += 1;
         }
-      }      
+      }
       in_bitcounter += 1;     //continue cyling in groups of 10 bits
       if (in_bitcounter > 9) in_bitcounter = 0;
     }
