@@ -73,7 +73,7 @@ ICACHE_RAM_ATTR void ITHOcheck() {
   has_packet = true;
 }
 
-void showPacket(IthoCC1101 &rf) { // TODO: const
+void showPacket(const IthoCC1101 &rf) { // TODO: const
   Serial.print("command=");
   IthoCommand cmd = rf.getLastCommand();
   switch (cmd) {
@@ -111,9 +111,6 @@ void showPacket(IthoCC1101 &rf) { // TODO: const
 
   Serial.print(", id=");
   Serial.print(rf.getLastIDstr(false));
-
-  Serial.print(", rssi=");
-  Serial.print(rf.ReadRSSI());
 
   Serial.print("\n");
 }

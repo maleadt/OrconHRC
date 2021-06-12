@@ -53,11 +53,6 @@ IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 
 } //IthoCC1101
 
-// default destructor
-IthoCC1101::~IthoCC1101()
-{
-} //~IthoCC1101
-
 void IthoCC1101::initSendMessage(uint8_t len)
 {
   //finishTransfer();
@@ -789,15 +784,7 @@ uint8_t IthoCC1101::ReadRSSI()
   return (value);
 }
 
-bool IthoCC1101::checkID(const uint8_t *id)
-{
-  for (uint8_t i = 0; i < 3; i++)
-    if (id[i] != inIthoPacket.deviceId[i])
-      return false;
-  return true;
-}
-
-String IthoCC1101::getLastIDstr(bool ashex) {
+String IthoCC1101::getLastIDstr(bool ashex) const {
   String str;
   for (uint8_t i = 0; i < 3; i++) {
     if (ashex) str += String(inIthoPacket.deviceId[i], HEX);
@@ -807,7 +794,7 @@ String IthoCC1101::getLastIDstr(bool ashex) {
   return str;
 }
 
-int * IthoCC1101::getLastID() {
+int * IthoCC1101::getLastID() const {
   static int id[3];
   for (uint8_t i = 0; i < 3; i++) {
     id[i] = inIthoPacket.deviceId[i];
@@ -815,7 +802,7 @@ int * IthoCC1101::getLastID() {
   return id;
 }
 
-String IthoCC1101::getLastMessagestr(bool ashex) {
+String IthoCC1101::getLastMessagestr(bool ashex) const {
   String str = "Length=" + String(inMessage.length) + ".";
   for (uint8_t i = 0; i < inMessage.length; i++) {
     if (ashex) str += String(inMessage.data[i], HEX);
@@ -825,8 +812,7 @@ String IthoCC1101::getLastMessagestr(bool ashex) {
   return str;
 }
 
-String IthoCC1101::LastMessageDecoded() {
-
+String IthoCC1101::LastMessageDecoded() const {
   String str;
   if (inIthoPacket.length > 11) {
     str += "Device type?: " + String(inIthoPacket.deviceType);
@@ -846,5 +832,4 @@ String IthoCC1101::LastMessageDecoded() {
   }
   str += "\n";
   return str;
-
 }

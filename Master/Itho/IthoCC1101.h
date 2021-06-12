@@ -1,5 +1,5 @@
 /*
- * Author: Klusjesman, supersjimmie, modified and reworked by arjenhiemstra 
+ * Author: Klusjesman, supersjimmie, modified and reworked by arjenhiemstra
  */
 
 #ifndef __ITHOCC1101_H__
@@ -46,70 +46,68 @@ const uint8_t ithoMessageLeaveCommandBytes[] =    {31,201,6,0,31,201};
 
 class IthoCC1101 : protected CC1101
 {
-  private:
-    //receive
-    CC1101Packet inMessage;                       //temp storage message2
-    IthoPacket inIthoPacket;                        //stores last received message data
-    
-    //send
-    IthoPacket outIthoPacket;                       //stores state of "remote"
-
-    //settings
-    uint8_t sendTries;                            //number of times a command is send at one button press
-    
-  //functions
   public:
     IthoCC1101(uint8_t counter = 0, uint8_t sendTries = 3);   //set initial counter value
-    ~IthoCC1101();
-    
-    //init
+    ~IthoCC1101() {};
+
+    // initialization
     void init() { CC1101::init(); initReceive(); }                    //init,reset CC1101
     void initReceive();
     uint8_t getLastCounter() { return outIthoPacket.counter; }        //counter is increased before sending a command
     void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
     void setDeviceID(uint8_t byte0, uint8_t byte1, uint8_t byte2) { this->outIthoPacket.deviceId[0] = byte0; this->outIthoPacket.deviceId[1] = byte1; this->outIthoPacket.deviceId[2] = byte2;}
-    
-    //receive
+
+    // receiving
     bool checkForNewPacket();                       //check RX fifo for new data
-    IthoPacket getLastPacket() { return inIthoPacket; }           //retrieve last received/parsed packet from remote
-    IthoCommand getLastCommand() { return inIthoPacket.command; }           //retrieve last received/parsed command from remote
-    uint8_t getLastInCounter() { return inIthoPacket.counter; }           //retrieve last received/parsed command from remote
-    uint8_t ReadRSSI();
-    bool checkID(const uint8_t *id);
-    int * getLastID();
-    String getLastIDstr(bool ashex=true);
-    String getLastMessagestr(bool ashex=true);
-    String LastMessageDecoded();
-        
-    //send
+    IthoPacket getLastPacket() const { return inIthoPacket; }           //retrieve last received/parsed packet from remote
+    IthoCommand getLastCommand() const { return inIthoPacket.command; }           //retrieve last received/parsed command from remote
+    uint8_t getLastInCounter() const { return inIthoPacket.counter; }           //retrieve last received/parsed command from remote
+    int * getLastID() const;
+    String getLastIDstr(bool ashex=true) const;
+    String getLastMessagestr(bool ashex=true) const;
+    String LastMessageDecoded() const;
+
+    // sending
     void sendCommand(IthoCommand command);
-  protected:
+
+    // other
+    uint8_t ReadRSSI();
+
   private:
     IthoCC1101( const IthoCC1101 &c);
     IthoCC1101& operator=( const IthoCC1101 &c);
 
     //init CC1101 for receiving
     void initReceiveMessage();
-    
+
     //init CC1101 for sending
     void initSendMessage(uint8_t len);
-    void finishTransfer();    
-      
+    void finishTransfer();
+
     //parse received message
     bool parseMessageCommand();
     bool checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]);
-    
-    //send
+
+    // sending
     void createMessageStart(IthoPacket *itho, CC1101Packet *packet);
     void createMessageCommand(IthoPacket *itho, CC1101Packet *packet);
     void createMessageJoin(IthoPacket *itho, CC1101Packet *packet);
     void createMessageLeave(IthoPacket *itho, CC1101Packet *packet);
     uint8_t* getMessageCommandBytes(IthoCommand command);
     uint8_t getCounter2(IthoPacket *itho, uint8_t len);
-    
+
     uint8_t messageEncode(IthoPacket *itho, CC1101Packet *packet);
     void messageDecode(CC1101Packet *packet, IthoPacket *itho);
-    
+
+    //receive
+    CC1101Packet inMessage;                       //temp storage message2
+    IthoPacket inIthoPacket;                        //stores last received message data
+
+    //send
+    IthoPacket outIthoPacket;                       //stores state of "remote"
+
+    //settings
+    uint8_t sendTries;                            //number of times a command is send at one button press
 
 }; //IthoCC1101
 
