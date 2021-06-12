@@ -54,18 +54,20 @@ bool RFTidChk[3] = {false, false, false};
 void setup(void) {
   Serial.begin(115200);
   delay(500);
-  Serial.println("setup begin");
-  rf.setDeviceID(13, 123, 42); //DeviceID used to send commands, can also be changed on the fly for multi itho control
+
+  Serial.println("Initialization");
+  rf.setDeviceID(13, 123, 42);
   rf.init();
-  Serial.println("setup done");
-  sendRegister();
-  Serial.println("join command sent");
+
+  //Serial.println("Registering");
+  //sendRegister();
+
+  Serial.println("Listening for messages");
   pinMode(ITHO_IRQ_PIN, INPUT);
   attachInterrupt(ITHO_IRQ_PIN, ITHOcheck, FALLING);
 }
 
 void loop(void) {
-  // do whatever you want, check (and reset) the ITHOhasPacket flag whenever you like
   if (ITHOhasPacket) {
     if (rf.checkForNewPacket()) {
       IthoCommand cmd = rf.getLastCommand();
@@ -74,9 +76,10 @@ void loop(void) {
       RFTRSSI[RFTcommandpos]    = rf.ReadRSSI();
       bool chk = rf.checkID(RFTid);
       RFTidChk[RFTcommandpos]   = chk;
-      if ((cmd != IthoUnknown)) {  // only act on good cmd and correct id.
+      if ((cmd != IthoUnknown)) {  // only act on good cmd
         showPacket();
       }
+      ITHOhasPacket = false;
     }
   }
 }
@@ -86,7 +89,6 @@ ICACHE_RAM_ATTR void ITHOcheck() {
 }
 
 void showPacket() {
-  ITHOhasPacket = false;
   uint8_t goodpos = findRFTlastCommand();
   if (goodpos != -1)  RFTlastCommand = RFTcommand[goodpos];
   else                RFTlastCommand = IthoUnknown;
