@@ -38,25 +38,13 @@
 #define ITHO_IRQ_PIN 22 // pin 17 / D22
 
 IthoCC1101 rf;
-IthoPacket packet;
-
-const uint8_t RFTid[] = {130, 11, 156}; // my ID
-
-bool ITHOhasPacket = false;
-IthoCommand RFTcommand[3] = {IthoUnknown, IthoUnknown, IthoUnknown};
-byte RFTRSSI[3] = {0, 0, 0};
-byte RFTcommandpos = 0;
-IthoCommand RFTlastCommand = IthoLow;
-IthoCommand RFTstate = IthoUnknown;
-IthoCommand savedRFTstate = IthoUnknown;
-bool RFTidChk[3] = {false, false, false};
 
 void setup(void) {
   Serial.begin(115200);
   delay(500);
 
   Serial.println("Initialization");
-  rf.setDeviceID(13, 123, 42);
+  rf.setDeviceID(130, 11, 156);
   rf.init();
 
   //Serial.println("Registering");
@@ -67,102 +55,67 @@ void setup(void) {
   attachInterrupt(ITHO_IRQ_PIN, ITHOcheck, FALLING);
 }
 
+bool has_packet = false;
+
 void loop(void) {
-  if (ITHOhasPacket) {
+  if (has_packet) {
     if (rf.checkForNewPacket()) {
       IthoCommand cmd = rf.getLastCommand();
-      if (++RFTcommandpos > 2) RFTcommandpos = 0;  // store information in next entry of ringbuffers
-      RFTcommand[RFTcommandpos] = cmd;
-      RFTRSSI[RFTcommandpos]    = rf.ReadRSSI();
-      bool chk = rf.checkID(RFTid);
-      RFTidChk[RFTcommandpos]   = chk;
-      if ((cmd != IthoUnknown)) {  // only act on good cmd
-        showPacket();
-      }
-      ITHOhasPacket = false;
+      //if ((cmd != IthoUnknown)) {  // only act on good cmd
+        showPacket(rf);
+      //}
+      has_packet = false;
     }
   }
 }
 
 ICACHE_RAM_ATTR void ITHOcheck() {
-  ITHOhasPacket = true;
+  has_packet = true;
 }
 
-void showPacket() {
-  uint8_t goodpos = findRFTlastCommand();
-  if (goodpos != -1)  RFTlastCommand = RFTcommand[goodpos];
-  else                RFTlastCommand = IthoUnknown;
-  //show data
-  Serial.print(F("RFT Current Pos: "));
-  Serial.print(RFTcommandpos);
-  Serial.print(F(", Good Pos: "));
-  Serial.println(goodpos);
-  Serial.print(F("Stored 3 commands: "));
-  Serial.print(RFTcommand[0]);
-  Serial.print(F(" "));
-  Serial.print(RFTcommand[1]);
-  Serial.print(F(" "));
-  Serial.print(RFTcommand[2]);
-  Serial.print(F(" / Stored 3 RSSI's:     "));
-  Serial.print(RFTRSSI[0]);
-  Serial.print(F(" "));
-  Serial.print(RFTRSSI[1]);
-  Serial.print(F(" "));
-  Serial.print(RFTRSSI[2]);
-  Serial.print(F(" / Stored 3 ID checks: "));
-  Serial.print(RFTidChk[0]);
-  Serial.print(F(" "));
-  Serial.print(RFTidChk[1]);
-  Serial.print(F(" "));
-  Serial.print(RFTidChk[2]);
-  Serial.print(F(" / Last ID: "));
-  Serial.print(rf.getLastIDstr(false));
-
-  Serial.print(F(" / Command = "));
-  //show command
-  switch (RFTlastCommand) {
+void showPacket(IthoCC1101 &rf) { // TODO: const
+  Serial.print("command=");
+  IthoCommand cmd = rf.getLastCommand();
+  switch (cmd) {
     case IthoUnknown:
-      Serial.print("unknown\n");
+      Serial.print("unknown");
       break;
     case IthoLow:
-      Serial.print("low\n");
+      Serial.print("low");
       break;
     case IthoMedium:
-      Serial.print("medium\n");
+      Serial.print("medium");
       break;
     case IthoHigh:
-      Serial.print("high\n");
+      Serial.print("high");
       break;
     case IthoFull:
-      Serial.print("full\n");
+      Serial.print("full");
       break;
     case IthoTimer1:
-      Serial.print("timer1\n");
+      Serial.print("timer1");
       break;
     case IthoTimer2:
-      Serial.print("timer2\n");
+      Serial.print("timer2");
       break;
     case IthoTimer3:
-      Serial.print("timer3\n");
+      Serial.print("timer3");
       break;
     case IthoJoin:
-      Serial.print("join\n");
+      Serial.print("join");
       break;
     case IthoLeave:
-      Serial.print("leave\n");
+      Serial.print("leave");
       break;
   }
-}
 
-uint8_t findRFTlastCommand() {
-  if (RFTcommand[RFTcommandpos] != IthoUnknown)               return RFTcommandpos;
-  if ((RFTcommandpos == 0) && (RFTcommand[2] != IthoUnknown)) return 2;
-  if ((RFTcommandpos == 0) && (RFTcommand[1] != IthoUnknown)) return 1;
-  if ((RFTcommandpos == 1) && (RFTcommand[0] != IthoUnknown)) return 0;
-  if ((RFTcommandpos == 1) && (RFTcommand[2] != IthoUnknown)) return 2;
-  if ((RFTcommandpos == 2) && (RFTcommand[1] != IthoUnknown)) return 1;
-  if ((RFTcommandpos == 2) && (RFTcommand[0] != IthoUnknown)) return 0;
-  return -1;
+  Serial.print(", id=");
+  Serial.print(rf.getLastIDstr(false));
+
+  Serial.print(", rssi=");
+  Serial.print(rf.ReadRSSI());
+
+  Serial.print("\n");
 }
 
 void sendRegister() {
