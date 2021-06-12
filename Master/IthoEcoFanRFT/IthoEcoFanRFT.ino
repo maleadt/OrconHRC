@@ -35,12 +35,12 @@
 #include "IthoCC1101.h"
 #include "IthoPacket.h"
 
-#define ITHO_IRQ_PIN 4 //D2(GPIO4) on NodeMCU
+#define ITHO_IRQ_PIN 22 // pin 17 / D22
 
 IthoCC1101 rf;
 IthoPacket packet;
 
-const uint8_t RFTid[] = {11, 22, 33}; // my ID
+const uint8_t RFTid[] = {130, 11, 156}; // my ID
 
 bool ITHOhasPacket = false;
 IthoCommand RFTcommand[3] = {IthoUnknown, IthoUnknown, IthoUnknown};
