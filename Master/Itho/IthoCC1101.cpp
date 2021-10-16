@@ -3,6 +3,7 @@
 */
 #define DEBUG 0
 
+//printf("Leading text "BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(byte));
 #define BYTE_TO_BINARY_PATTERN "%c,%c,%c,%c,%c,%c,%c,%c,"
 #define BYTE_TO_BINARY(byte)  \
   (byte & 0x80 ? '1' : '0'), \
@@ -15,6 +16,7 @@
   (byte & 0x01 ? '1' : '0')
 
 #include "IthoCC1101.h"
+#include "IthoPacket.h"
 #include <string.h>
 #include <Arduino.h>
 #include <SPI.h>
@@ -27,17 +29,17 @@
 //#define SYNC0 171
 //#define MDMCFG2 0x02 //16bit sync word / 16bit specific
 
-////alternative sync byte pattern (filter much more non-itho messages out. Maybe too strict? Testing needed.
-//#define STARTBYTE 0 //relevant data starts 0 bytes after the sync pattern bytes 179/42/171/42
-//#define SYNC1 187 //byte11 = 179, byte13 = 171 with SYNC1 = 163, 179 and 171 differ only by 1 bit
-//#define SYNC0 42
-//#define MDMCFG2 0x03 //32bit sync word / 30bit specific
+//alternative sync byte pattern (filter much more non-itho messages out. Maybe too strict? Testing needed.
+#define STARTBYTE 0 //relevant data starts 0 bytes after the sync pattern bytes 179/42/171/42
+#define SYNC1 187 //byte11 = 179, byte13 = 171 with SYNC1 = 163, 179 and 171 differ only by 1 bit
+#define SYNC0 42
+#define MDMCFG2 0x03 //32bit sync word / 30bit specific
 
 //alternative sync byte pattern
-#define STARTBYTE 2 //relevant data starts 2 bytes after the sync pattern bytes 179/42
-#define SYNC1 179
-#define SYNC0 42
-#define MDMCFG2 0x02 //16bit sync word / 16bit specific
+//#define STARTBYTE 2 //relevant data starts 2 bytes after the sync pattern bytes 179/42
+//#define SYNC1 179
+//#define SYNC0 42
+//#define MDMCFG2 0x02 //16bit sync word / 16bit specific
 
 // default constructor
 IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
@@ -50,6 +52,15 @@ IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
   this->outIthoPacket.deviceId[2] = 99;
 
   this->outIthoPacket.deviceType = 22;
+
+  cc_freq[0] = 0x6A;
+  cc_freq[1] = 0x65;
+  cc_freq[2] = 0x21;
+
+  bindAllowed = false;
+  allowAll = true;
+
+
 
 } //IthoCC1101
 
@@ -89,9 +100,9 @@ void IthoCC1101::initSendMessage(uint8_t len)
   writeCommand(CC1101_SRES);
   delayMicroseconds(1);
   writeRegister(CC1101_IOCFG0 , 0x2E);    //High impedance (3-state)
-  writeRegister(CC1101_FREQ2 , 0x21);   //00100001  878MHz-927.8MHz
-  writeRegister(CC1101_FREQ1 , 0x65);   //01100101
-  writeRegister(CC1101_FREQ0 , 0x6A);   //01101010
+  writeRegister(CC1101_FREQ2 , cc_freq[2]);   //00100001  878MHz-927.8MHz
+  writeRegister(CC1101_FREQ1 , cc_freq[1]);   //01100101
+  writeRegister(CC1101_FREQ0 , cc_freq[0]);   //01101010
   writeRegister(CC1101_MDMCFG4 , 0x5A); //difference compared to message1
   writeRegister(CC1101_MDMCFG3 , 0x83); //difference compared to message1
   writeRegister(CC1101_MDMCFG2 , 0x00); //00000000  2-FSK, no manchester encoding/decoding, no preamble/sync
@@ -191,22 +202,22 @@ void IthoCC1101::initReceive()
 
   writeRegister(CC1101_FSCAL2 , 0x00);
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
-  writeRegister(CC1101_FREQ2 , 0x21);
-  writeRegister(CC1101_FREQ1 , 0x65);
-  writeRegister(CC1101_FREQ0 , 0x6A);
+  writeRegister(CC1101_FREQ2 , cc_freq[2]);
+  writeRegister(CC1101_FREQ1 , cc_freq[1]);
+  writeRegister(CC1101_FREQ0 , cc_freq[0]);
   writeRegister(CC1101_IOCFG0 , 0x2E);      //High impedance (3-state)
   writeRegister(CC1101_IOCFG2 , 0x06);      //0x06 Assert when sync word has been sent / received, and de-asserts at the end of the packet.
-  writeRegister(CC1101_FSCTRL1 , 0x06);
+  writeRegister(CC1101_FSCTRL1 , 0x0F); //change 06
   writeRegister(CC1101_FSCTRL0 , 0x00);
-  writeRegister(CC1101_MDMCFG4 , 0x5A);
+  writeRegister(CC1101_MDMCFG4 , 0x6A);
   writeRegister(CC1101_MDMCFG3 , 0x83);
-  writeRegister(CC1101_MDMCFG2 , 0x00);   //Enable digital DC blocking filter before demodulator, 2-FSK, Disable Manchester encoding/decoding, No preamble/sync
+  writeRegister(CC1101_MDMCFG2 , 0x10);   //Enable digital DC blocking filter before demodulator, 2-FSK, Disable Manchester encoding/decoding, No preamble/sync
   writeRegister(CC1101_MDMCFG1 , 0x22);   //Disable FEC
   writeRegister(CC1101_MDMCFG0 , 0xF8);
   writeRegister(CC1101_CHANNR , 0x00);
   writeRegister(CC1101_DEVIATN , 0x50);
   writeRegister(CC1101_FREND1 , 0x56);
-  writeRegister(CC1101_FREND0 , 0x17);
+  writeRegister(CC1101_FREND0 , 0x10);
   writeRegister(CC1101_MCSM0 , 0x18);     //no auto calibrate
   writeRegister(CC1101_FOCCFG , 0x16);
   writeRegister(CC1101_BSCFG , 0x6C);
@@ -214,18 +225,18 @@ void IthoCC1101::initReceive()
   writeRegister(CC1101_AGCCTRL1 , 0x40);
   writeRegister(CC1101_AGCCTRL0 , 0x91);
   writeRegister(CC1101_FSCAL3 , 0xE9);
-  writeRegister(CC1101_FSCAL2 , 0x2A);
+  writeRegister(CC1101_FSCAL2 , 0x21);
   writeRegister(CC1101_FSCAL1 , 0x00);
-  writeRegister(CC1101_FSCAL0 , 0x11);
+  writeRegister(CC1101_FSCAL0 , 0x1F);
   writeRegister(CC1101_FSTEST , 0x59);
   writeRegister(CC1101_TEST2 , 0x81);
   writeRegister(CC1101_TEST1 , 0x35);
-  writeRegister(CC1101_TEST0 , 0x0B);
+  writeRegister(CC1101_TEST0 , 0x09);
   writeRegister(CC1101_PKTCTRL1 , 0x04);    //No address check, Append two bytes with status RSSI/LQI/CRC OK,
   writeRegister(CC1101_PKTCTRL0 , 0x32);    //Infinite packet length mode, CRC disabled for TX and RX, No data whitening, Asynchronous serial mode, Data in on GDO0 and data out on either of the GDOx pins
   writeRegister(CC1101_ADDR , 0x00);
   writeRegister(CC1101_PKTLEN , 0xFF);
-  writeRegister(CC1101_TEST0 , 0x09);
+
 
   writeCommand(CC1101_SCAL);
 
@@ -254,15 +265,15 @@ void  IthoCC1101::initReceiveMessage()
   writeCommand(CC1101_SIDLE); //idle
 
   //set datarate
-  writeRegister(CC1101_MDMCFG4 , 0x5A); // set kBaud
+  writeRegister(CC1101_MDMCFG4 , 0x6A); // set kBaud
   writeRegister(CC1101_MDMCFG3 , 0x83); // set kBaud
   writeRegister(CC1101_DEVIATN , 0x50);
 
   //set fifo mode with fixed packet length and sync bytes
-  writeRegister(CC1101_PKTLEN , 63);      //63 bytes message (sync at beginning of message is removed by CC1101)
+  //writeRegister(CC1101_PKTLEN , 63);      //63 bytes message (sync at beginning of message is removed by CC1101)
 
   //set fifo mode with fixed packet length and sync bytes
-  writeRegister(CC1101_PKTCTRL0 , 0x00);
+  writeRegister(CC1101_PKTCTRL0 , 0x02);
   writeRegister(CC1101_SYNC1 , SYNC1);
   writeRegister(CC1101_SYNC0 , SYNC0);
   writeRegister(CC1101_MDMCFG2 , MDMCFG2);
@@ -278,17 +289,116 @@ void  IthoCC1101::initReceiveMessage()
   }
 }
 
+uint8_t IthoCC1101::receivePacket() {
+  return readData(&inMessage, MAX_RAW);
+}
+
 bool IthoCC1101::checkForNewPacket() {
-  if (receiveData(&inMessage, 63) && parseMessageCommand()) {
+  bool result = false;
+  if (parseMessageCommand()) {
     initReceiveMessage();
-    return true;
+    result = true;
   }
-  return false;
+
+  return result;
 }
 
 bool IthoCC1101::parseMessageCommand() {
 
   messageDecode(&inMessage, &inIthoPacket);
+
+  uint8_t dataPos = 0;
+  inIthoPacket.error = 0;
+  inIthoPacket.command = IthoUnknown;
+
+  //first byte is the header of the message, this determines the structure of the rest of the message
+  //The bits are used as follows <00TTAAPP>
+  // 00 - Unused
+  // TT - Message type
+  // AA - Present DeviceID fields
+  // PP - Present Params
+  inIthoPacket.header  = inIthoPacket.dataDecoded[0];
+  dataPos++;
+
+  //packet type: RQ-Request, W-Write, I-Inform, RP-Response
+  if ((inIthoPacket.dataDecoded[0] >> 4) > 3) {
+    inIthoPacket.error = 1;
+    return false;
+  }
+  inIthoPacket.type = inIthoPacket.dataDecoded[0] >> 4;
+
+  inIthoPacket.deviceId0 = 0;
+  inIthoPacket.deviceId1 = 0;
+  inIthoPacket.deviceId2 = 0;
+
+  //get DeviceID fields
+  uint8_t idfield = (inIthoPacket.dataDecoded[0] >> 2) & 0x03;
+
+  if (idfield == 0x00 || idfield == 0x02 || idfield == 0x03) {
+    inIthoPacket.deviceId0 = inIthoPacket.dataDecoded[dataPos] << 16 | inIthoPacket.dataDecoded[dataPos + 1] << 8 | inIthoPacket.dataDecoded[dataPos + 2];
+    dataPos += 3;
+    if (idfield == 0x00 || idfield == 0x03) {
+      inIthoPacket.deviceId1 = inIthoPacket.dataDecoded[dataPos] << 16 | inIthoPacket.dataDecoded[dataPos + 1] << 8 | inIthoPacket.dataDecoded[dataPos + 2];
+      dataPos += 3;
+    }
+    if (idfield == 0x00 || idfield == 0x02) {
+      inIthoPacket.deviceId2 = inIthoPacket.dataDecoded[dataPos] << 16 | inIthoPacket.dataDecoded[dataPos + 1] << 8 | inIthoPacket.dataDecoded[dataPos + 2];
+      dataPos += 3;
+    }
+  }
+  else {
+    inIthoPacket.deviceId2 = inIthoPacket.dataDecoded[dataPos] << 16 | inIthoPacket.dataDecoded[dataPos + 1] << 8 | inIthoPacket.dataDecoded[dataPos + 2];
+    dataPos += 3;
+  }
+
+  //determine param0 present
+  if (inIthoPacket.dataDecoded[0] & 0x02) {
+    inIthoPacket.param0 = inIthoPacket.dataDecoded[dataPos];
+
+    dataPos++;
+  }
+  else {
+    inIthoPacket.param0 = 0;
+  }
+  //determine param1 present
+  if (inIthoPacket.dataDecoded[0] & 0x01) {
+    inIthoPacket.param1 = inIthoPacket.dataDecoded[dataPos];
+    dataPos++;
+  }
+  else {
+    inIthoPacket.param1 = 0;
+  }
+
+  //Get the two bytes of the opcode
+  inIthoPacket.opcode = inIthoPacket.dataDecoded[dataPos] << 8 | inIthoPacket.dataDecoded[dataPos + 1];
+  dataPos += 2;
+
+  //Payload length
+  inIthoPacket.len = inIthoPacket.dataDecoded[dataPos];
+  if (inIthoPacket.len > MAX_PAYLOAD) {
+    inIthoPacket.error = 1;
+    return false;
+  }
+
+  dataPos++;
+  inIthoPacket.payloadPos = dataPos;
+
+
+  //Now we have parsed all the variable fields and know the total lenth of the message
+  //with that we can determine if the message CRC is correct
+  uint8_t mLen = inIthoPacket.payloadPos + inIthoPacket.len;
+
+  if (getCounter2(&inIthoPacket, mLen) != inIthoPacket.dataDecoded[mLen]) {
+    inIthoPacket.error = 2;
+#if defined (CRC_FILTER)
+    inIthoPacket.command = IthoUnknown;
+    return false;
+#endif
+  }
+
+  //
+  // old message parse code below
+  //
 
   //deviceType of message type?
   inIthoPacket.deviceType  = inIthoPacket.dataDecoded[0];
@@ -297,64 +407,41 @@ bool IthoCC1101::parseMessageCommand() {
   inIthoPacket.deviceId[0] = inIthoPacket.dataDecoded[1];
   inIthoPacket.deviceId[1] = inIthoPacket.dataDecoded[2];
   inIthoPacket.deviceId[2] = inIthoPacket.dataDecoded[3];
-  
+
   //counter1
   inIthoPacket.counter = inIthoPacket.dataDecoded[4];
 
-  bool isHighCommand      = checkIthoCommand(&inIthoPacket, ithoMessageHighCommandBytes);
-  bool isRVHighCommand    = checkIthoCommand(&inIthoPacket, ithoMessageRVHighCommandBytes);
-  bool isMediumCommand    = checkIthoCommand(&inIthoPacket, ithoMessageMediumCommandBytes);
-  bool isRVMediumCommand  = checkIthoCommand(&inIthoPacket, ithoMessageRVMediumCommandBytes);
-  bool isLowCommand       = checkIthoCommand(&inIthoPacket, ithoMessageLowCommandBytes);
-  bool isRVLowCommand     = checkIthoCommand(&inIthoPacket, ithoMessageRVLowCommandBytes);
-  bool isRVAutoCommand    = checkIthoCommand(&inIthoPacket, ithoMessageRVAutoCommandBytes);
-  bool isStandByCommand   = checkIthoCommand(&inIthoPacket, ithoMessageStandByCommandBytes);
-  bool isTimer1Command    = checkIthoCommand(&inIthoPacket, ithoMessageTimer1CommandBytes);
-  bool isTimer2Command    = checkIthoCommand(&inIthoPacket, ithoMessageTimer2CommandBytes);
-  bool isTimer3Command    = checkIthoCommand(&inIthoPacket, ithoMessageTimer3CommandBytes);
-  bool isJoinCommand      = checkIthoCommand(&inIthoPacket, ithoMessageJoinCommandBytes);
-  bool isJoin2Command     = checkIthoCommand(&inIthoPacket, ithoMessageJoin2CommandBytes);
-  bool isRVJoinCommand    = checkIthoCommand(&inIthoPacket, ithoMessageRVJoinCommandBytes);
-  bool isLeaveCommand     = checkIthoCommand(&inIthoPacket, ithoMessageLeaveCommandBytes);
+  //handle command
+  switch (inIthoPacket.opcode) {
+    case IthoPacket::Type::BIND :
+      handleBind();
+      break;
+    case IthoPacket::Type::LEVEL :
+      handleLevel();
+      break;
+    case IthoPacket::Type::SETPOINT :
+      break;
+    case IthoPacket::Type::TIMER :
+      handleTimer();
+      break;
+    case IthoPacket::Type::STATUS :
+      handleStatus();
+      break;
+    case IthoPacket::Type::REMOTESTATUS :
+      handleRemotestatus();
+      break;
+    case IthoPacket::Type::TEMPHUM :
+      handleTemphum();
+      break;
+    case IthoPacket::Type::CO2 :
+      handleCo2();
+      break;
+    case IthoPacket::Type::BATTERY :
+      handleBattery();
+      break;
+  }
 
-  //determine command
-  inIthoPacket.command = IthoUnknown;
-  if (isHighCommand)     inIthoPacket.command = IthoHigh;
-  if (isRVHighCommand)   inIthoPacket.command = IthoHigh;
-  if (isMediumCommand)   inIthoPacket.command = IthoMedium;
-  if (isRVMediumCommand) inIthoPacket.command = IthoMedium;
-  if (isLowCommand)      inIthoPacket.command = IthoLow;
-  if (isRVLowCommand)    inIthoPacket.command = IthoLow;
-  if (isRVAutoCommand)   inIthoPacket.command = IthoStandby;
-  if (isStandByCommand)  inIthoPacket.command = IthoStandby;
-  if (isTimer1Command)   inIthoPacket.command = IthoTimer1;
-  if (isTimer2Command)   inIthoPacket.command = IthoTimer2;
-  if (isTimer3Command)   inIthoPacket.command = IthoTimer3;
-  if (isJoinCommand)     inIthoPacket.command = IthoJoin;
-  if (isJoin2Command)    inIthoPacket.command = IthoJoin;
-  if (isRVJoinCommand)   inIthoPacket.command = IthoJoin;
-  if (isLeaveCommand)    inIthoPacket.command = IthoLeave;
 
-#if defined (CRC_FILTER)
-  uint8_t mLen = 0;
-  if (isPowerCommand || isHighCommand || isMediumCommand || isLowCommand || isStandByCommand || isTimer1Command || isTimer2Command || isTimer3Command) {
-    mLen = 11;
-  }
-  else if (isJoinCommand || isJoin2Command) {
-    mLen = 20;
-  }
-  else if (isLeaveCommand) {
-    mLen = 14;
-  }
-  else {
-    return true;
-  }
-  if (getCounter2(&inIthoPacket, mLen) != inIthoPacket.dataDecoded[mLen]) {
-    inIthoPacket.command = IthoUnknown;
-    return false;
-  }
-#endif
-  
   return true;
 }
 
@@ -629,15 +716,6 @@ uint8_t IthoCC1101::getCounter2(IthoPacket *itho, uint8_t len) {
 
 uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
 
-  uint8_t lenOutbuf = 0;
-
-  if ((itho->length * 20) % 8 == 0) { //inData len fits niecly in out buffer length
-    lenOutbuf = itho->length * 2.5;
-  }
-  else { //is this an issue? inData last byte does not fill out buffer length, add 1 out byte extra, padding is done after encode
-    lenOutbuf = (uint8_t)(itho->length * 2.5) + 0.5;
-  }
-
   uint8_t out_bytecounter = 14;   //index of Outbuf, start at offset 14, first part of the message is set manually
   uint8_t out_bitcounter = 0;     //bit position of current outbuf byte
   uint8_t out_patterncounter = 0; //bit counter to add 1 0 bit pattern after every 8 bits
@@ -649,7 +727,6 @@ uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
     packet->data[i] = 0;
   }
 
-  //Serial.println();
   for (uint8_t dataByte = 0; dataByte < itho->length; dataByte++) {
     for (uint8_t dataBit = 0; dataBit < 8; dataBit++) {                                     //process a full dataByte at a time resulting in 20 output bits (2.5 bytes) with the pattern 7x6x5x4x 10 3x2x1x0x 10 7x6x5x4x 10 3x2x1x0x 10 etc
       if (out_bitcounter == 8) {                                                            //check if new byte is needed
@@ -709,12 +786,12 @@ uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
 
 
 void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
-  
+
   itho->length = 0;
   int lenInbuf = packet->length;
 
   lenInbuf -= STARTBYTE; //correct for sync byte pos
-  
+
   while (lenInbuf >= 5) {
     lenInbuf -= 5;
     itho->length += 2;
@@ -729,7 +806,7 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
   for (int i = 0; i < sizeof(itho->dataDecodedChk) / sizeof(itho->dataDecodedChk[0]); i++) {
     itho->dataDecodedChk[i] = 0;
   }
-  
+
   uint8_t out_i = 0;                                  //byte index
   uint8_t out_j = 4;                                  //bit index
   uint8_t out_i_chk = 0;                              //byte index
@@ -761,7 +838,7 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
           itho->dataDecodedChk[out_i_chk] = ~itho->dataDecodedChk[out_i_chk]; //inverse bits
           out_i_chk += 1;
         }
-      }      
+      }
       in_bitcounter += 1;     //continue cyling in groups of 10 bits
       if (in_bitcounter > 9) in_bitcounter = 0;
     }
@@ -828,18 +905,79 @@ String IthoCC1101::getLastMessagestr(bool ashex) {
 String IthoCC1101::LastMessageDecoded() {
 
   String str;
+
+
   if (inIthoPacket.length > 11) {
-    str += "Device type?: " + String(inIthoPacket.deviceType);
-    str += " - CMD: ";
-    for (int i = 4; i < inIthoPacket.length; i++) {
-      str += String(inIthoPacket.dataDecoded[i]);
-      if (i < inIthoPacket.length - 1) str += ",";
+
+    str += String(MsgType[inIthoPacket.type]);
+
+    if (inIthoPacket.param0 == 0)  {
+      str += " ---";
     }
+    else {
+      str += " ";
+      str += String(inIthoPacket.param0);
+    }
+
+    if (inIthoPacket.deviceId0 == 0)  {
+      str += " --,--,--";
+    }
+    else {
+      str += " ";
+      char buf[10];
+      snprintf(buf, sizeof(buf), "%02X,%02X,%02X", inIthoPacket.deviceId0 >> 16 & 0xFF, inIthoPacket.deviceId0 >> 8 & 0xFF, inIthoPacket.deviceId0 & 0xFF);
+      str += String(buf);
+    }
+    if (inIthoPacket.deviceId1 == 0)  {
+      str += " --,--,--";
+    }
+    else {
+      str += " ";
+      char buf[10];
+      sprintf(buf, "%02X,%02X,%02X", inIthoPacket.deviceId1 >> 16 & 0xFF, inIthoPacket.deviceId1 >> 8 & 0xFF, inIthoPacket.deviceId1 & 0xFF);
+      str += String(buf);
+    }
+    if (inIthoPacket.deviceId2 == 0)  {
+      str += " --,--,--";
+    }
+    else {
+      str += " ";
+      char buf[10];
+      sprintf(buf, "%02X,%02X,%02X", inIthoPacket.deviceId2 >> 16 & 0xFF, inIthoPacket.deviceId2 >> 8 & 0xFF, inIthoPacket.deviceId2 & 0xFF);
+      str += String(buf);
+    }
+
+
+    str += " ";
+
+    char buf[10];
+    sprintf(buf, "%04X", inIthoPacket.opcode);
+    str += String(buf);
+
+    str += " ";
+    str += String(inIthoPacket.len);
+    str += ":";
+
+    for (int i = inIthoPacket.payloadPos; i < inIthoPacket.payloadPos + inIthoPacket.len; i++) {
+      sprintf(buf, "%02X", inIthoPacket.dataDecoded[i]);
+      str += String(buf);
+      if (i < inIthoPacket.payloadPos + inIthoPacket.len - 1) {
+        str += ",";
+      }
+    }
+    str += "\n";
+    //    for (int i = 0; i < inIthoPacket.length; i++) {
+    //      sprintf(buf, "%02X", inIthoPacket.dataDecoded[i]);
+    //      str += String(buf);
+    //      if (i < inIthoPacket.length - 1) str += ",";
+    //    }
 
   }
   else {
     for (uint8_t i = 0; i < inIthoPacket.length; i++) {
-      str += String(inIthoPacket.dataDecoded[i]);
+      char buf[10];
+      sprintf(buf, "%02X", inIthoPacket.dataDecoded[i]);
+      str += String(buf);
       if (i < inIthoPacket.length - 1) str += ",";
     }
 
@@ -847,4 +985,268 @@ String IthoCC1101::LastMessageDecoded() {
   str += "\n";
   return str;
 
+}
+
+bool IthoCC1101::addRFDevice(uint8_t byte0, uint8_t byte1, uint8_t byte2) {
+  uint32_t tempID = byte0 << 16 | byte1 << 8 | byte2;
+  return addRFDevice(tempID);
+}
+bool IthoCC1101::addRFDevice(uint32_t ID) {
+  if (!bindAllowed) return false;
+  if (checkRFDevice(ID)) return false; //device already registered
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == 0) { //pick the first available slot
+      item.deviceId = ID;
+      ithoRF.count++;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool IthoCC1101::removeRFDevice(uint8_t byte0, uint8_t byte1, uint8_t byte2) {
+  uint32_t tempID = byte0 << 16 | byte1 << 8 | byte2;
+  return removeRFDevice(tempID);
+}
+
+bool IthoCC1101::removeRFDevice(uint32_t ID) {
+  if (!bindAllowed) return false;
+  if (!checkRFDevice(ID)) return false; //device not registered
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == ID) {
+      item.deviceId = 0;
+      //      strcpy(item.name, "");
+      item.lastCommand = IthoUnknown;
+      item.co2 = 0xEFFF;
+      item.temp = 0xEFFF;
+      item.hum = 0xEFFF;
+      item.dewpoint = 0xEFFF;
+      item.battery = 0xEFFF;
+      ithoRF.count--;
+      return true;
+    }
+  }
+
+  return false; //not found
+}
+
+bool IthoCC1101::checkRFDevice(uint8_t byte0, uint8_t byte1, uint8_t byte2) {
+  uint32_t tempID = byte0 << 16 | byte1 << 8 | byte2;
+  return checkRFDevice(tempID);
+}
+
+bool IthoCC1101::checkRFDevice(uint32_t ID) {
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == ID) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void IthoCC1101::handleBind() {
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if ( checkIthoCommand(&inIthoPacket, ithoMessageLeaveCommandBytes) ) {
+    inIthoPacket.command = IthoLeave;
+    if (bindAllowed) {
+      removeRFDevice(tempID);
+    }
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageJoinCommandBytes) || checkIthoCommand(&inIthoPacket, ithoMessageJoin2CommandBytes) ) {
+    inIthoPacket.command = IthoJoin;
+    if (bindAllowed) {
+      addRFDevice(tempID);
+    }
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageRVJoinCommandBytes) ) {
+    inIthoPacket.command = IthoJoin;
+    if (bindAllowed) {
+      addRFDevice(tempID);
+    }
+    //TODO: handle join handshake
+  }
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      item.lastCommand = inIthoPacket.command;
+    }
+  }
+  
+}
+
+void IthoCC1101::handleLevel() {
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!allowAll) {
+    if (!checkRFDevice( tempID )) return;
+  }
+  if ( checkIthoCommand(&inIthoPacket, ithoMessageHighCommandBytes) ) {
+    inIthoPacket.command = IthoHigh;
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageMediumCommandBytes) ) {
+    inIthoPacket.command = IthoMedium;
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageLowCommandBytes) ) {
+    inIthoPacket.command = IthoLow;
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageStandByCommandBytes) ) {
+    inIthoPacket.command = IthoStandby;
+  }
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      item.lastCommand = inIthoPacket.command;
+    }
+  }
+  
+}
+
+void IthoCC1101::handleTimer() {
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!allowAll) {
+    if (!checkRFDevice( tempID )) return;
+  }
+  if ( checkIthoCommand(&inIthoPacket, ithoMessageTimer1CommandBytes) ) {
+    inIthoPacket.command = IthoTimer1;
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageTimer2CommandBytes) ) {
+    inIthoPacket.command = IthoTimer2;
+  }
+  else if ( checkIthoCommand(&inIthoPacket, ithoMessageTimer3CommandBytes) ) {
+    inIthoPacket.command = IthoTimer3;
+  }
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      item.lastCommand = inIthoPacket.command;
+    }
+  }
+
+}
+void IthoCC1101::handleStatus() {
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!checkRFDevice( tempID )) return;
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      //store last command
+    }
+  }
+}
+void IthoCC1101::handleRemotestatus() {
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!checkRFDevice( tempID )) return;
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      //store last command
+    }
+  }
+
+}
+void IthoCC1101::handleTemphum() {
+  /*
+     message length: 6
+     message opcode: 0x12A0
+     byte[0]    : unknown
+     byte[1]    : humidity
+     bytes[2:3] : temperature
+     bytes[4:5] : dewpoint temperature
+
+  */
+  if(inIthoPacket.error > 0) return;
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!checkRFDevice( tempID )) return;
+  int32_t tempHum  = inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 1];
+  int32_t tempTemp = inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 2] << 8 | inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 3];
+  int32_t tempDewp = inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 4] << 8 | inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 5];
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      item.temp = tempTemp;
+      item.hum = tempHum;
+      item.dewpoint = tempDewp;
+    }
+  }
+
+}
+
+
+void IthoCC1101::handleCo2() {
+  /*
+     message length: 3
+     message opcode: 0x1298
+     byte[0]    : unknown
+     bytes[1:2] : CO2 level
+
+  */
+  if(inIthoPacket.error > 0) return;
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!checkRFDevice( tempID )) return;
+  int32_t tempVal = inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 1] << 8 | inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 2];
+
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      item.co2 = tempVal;
+    }
+  }
+
+}
+void IthoCC1101::handleBattery() {
+  /*
+     message length: 3
+     message opcode: 0x1060
+     byte[0]  : zone_id
+     byte[1]  : battery level percentage (0xFF = no percentage present)
+     byte[2]  : battery state (0x01 OK, 0x00 LOW)
+
+  */
+  if(inIthoPacket.error > 0) return;
+  uint32_t tempID = 0;
+  if (inIthoPacket.deviceId0 != 0) tempID = inIthoPacket.deviceId0;
+  else if (inIthoPacket.deviceId2 != 0) tempID = inIthoPacket.deviceId2;
+  else return;
+
+  if (!checkRFDevice( tempID )) return;
+  int32_t tempVal = 10;
+  if (inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 1] == 0xFF) {
+    if (inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 2] == 0x01) tempVal = 100;
+  }
+  else {
+    tempVal = (int32_t)inIthoPacket.dataDecoded[inIthoPacket.payloadPos + 1] / 2;
+  }
+  for (auto& item : ithoRF.device) {
+    if (item.deviceId == tempID) {
+      item.battery = tempVal;
+    }
+  }
 }

@@ -81,13 +81,17 @@ void loop(void) {
   }
 }
 
+#if defined (ESP8266) && defined (ESP32)
 ICACHE_RAM_ATTR void ITHOcheck() {
+#else
+void ITHOcheck() {
+#endif
   ITHOhasPacket = true;
 }
 
 void showPacket() {
   ITHOhasPacket = false;
-  uint8_t goodpos = findRFTlastCommand();
+  int8_t goodpos = findRFTlastCommand();
   if (goodpos != -1)  RFTlastCommand = RFTcommand[goodpos];
   else                RFTlastCommand = IthoUnknown;
   //show data
@@ -122,6 +126,9 @@ void showPacket() {
     case IthoUnknown:
       Serial.print("unknown\n");
       break;
+    case IthoStandby:
+      Serial.print("standby\n");
+      break;      
     case IthoLow:
       Serial.print("low\n");
       break;
