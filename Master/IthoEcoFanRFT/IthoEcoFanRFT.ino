@@ -39,6 +39,9 @@
 
 IthoCC1101 rf;
 
+ICACHE_RAM_ATTR void ITHOcheck();
+void showPacket(const IthoCC1101 &rf);
+
 void setup(void) {
   Serial.begin(115200);
   delay(500);
@@ -58,7 +61,7 @@ void setup(void) {
 bool has_packet = false;
 
 void loop(void) {
-  if (has_packet) {
+  // if (has_packet) {
     if (rf.checkForNewPacket()) {
       IthoCommand cmd = rf.getLastCommand();
       //if ((cmd != IthoUnknown)) {  // only act on good cmd
@@ -66,53 +69,29 @@ void loop(void) {
       //}
       has_packet = false;
     }
-  }
+  // }
 }
 
 ICACHE_RAM_ATTR void ITHOcheck() {
   has_packet = true;
 }
 
+const char *int_to_binary_str(int x, int N_bits){
+    static char b[512];
+    char *p = b;
+    b[0] = '\0';
+
+    for(int i=(N_bits-1); i>=0; i--){
+      *p++ = (x & (1<<i)) ? '1' : '0';
+    }
+    return b;
+}
+
 void showPacket(const IthoCC1101 &rf) { // TODO: const
-  Serial.print("command=");
-  IthoCommand cmd = rf.getLastCommand();
-  switch (cmd) {
-    case IthoUnknown:
-      Serial.print("unknown");
-      break;
-    case IthoLow:
-      Serial.print("low");
-      break;
-    case IthoMedium:
-      Serial.print("medium");
-      break;
-    case IthoHigh:
-      Serial.print("high");
-      break;
-    case IthoFull:
-      Serial.print("full");
-      break;
-    case IthoTimer1:
-      Serial.print("timer1");
-      break;
-    case IthoTimer2:
-      Serial.print("timer2");
-      break;
-    case IthoTimer3:
-      Serial.print("timer3");
-      break;
-    case IthoJoin:
-      Serial.print("join");
-      break;
-    case IthoLeave:
-      Serial.print("leave");
-      break;
-  }
+  IthoPacket packet = rf.getLastPacket();
+  CC1101Packet message = rf.getLastMessage();
 
-  Serial.print(", id=");
-  Serial.print(rf.getLastIDstr(false));
-
-  Serial.print("\n");
+  Serial.println();
 }
 
 void sendRegister() {

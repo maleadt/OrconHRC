@@ -64,7 +64,7 @@ class IthoCC1101 : protected CC1101
     uint8_t getLastInCounter() const { return inIthoPacket.counter; }           //retrieve last received/parsed command from remote
     int * getLastID() const;
     String getLastIDstr(bool ashex=true) const;
-    String getLastMessagestr(bool ashex=true) const;
+    CC1101Packet getLastMessage() const;
     String LastMessageDecoded() const;
 
     // sending
@@ -97,7 +97,7 @@ class IthoCC1101 : protected CC1101
     uint8_t getCounter2(IthoPacket *itho, uint8_t len);
 
     uint8_t messageEncode(IthoPacket *itho, CC1101Packet *packet);
-    void messageDecode(CC1101Packet *packet, IthoPacket *itho);
+    bool messageDecode(CC1101Packet *packet, IthoPacket *itho);
 
     //receive
     CC1101Packet inMessage;                       //temp storage message2

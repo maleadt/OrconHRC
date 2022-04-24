@@ -15,6 +15,7 @@
   (byte & 0x01 ? '1' : '0')
 
 #include "IthoCC1101.h"
+#include "bitbuffer.h"
 #include <string.h>
 #include <Arduino.h>
 #include <SPI.h>
@@ -22,10 +23,10 @@
 //#define CRC_FILTER
 
 ////original sync byte pattern
-//#define STARTBYTE 6 //relevant data starts 6 bytes after the sync pattern bytes 170/171
-//#define SYNC1 170
-//#define SYNC0 171
-//#define MDMCFG2 0x02 //16bit sync word / 16bit specific
+#define STARTBYTE 6 //relevant data starts 6 bytes after the sync pattern bytes 170/171
+#define SYNC1 170
+#define SYNC0 171
+#define MDMCFG2 0x02 //16bit sync word / 16bit specific
 
 ////alternative sync byte pattern (filter much more non-itho messages out. Maybe too strict? Testing needed.
 //#define STARTBYTE 0 //relevant data starts 0 bytes after the sync pattern bytes 179/42/171/42
@@ -34,10 +35,10 @@
 //#define MDMCFG2 0x03 //32bit sync word / 30bit specific
 
 //alternative sync byte pattern
-#define STARTBYTE 2 //relevant data starts 2 bytes after the sync pattern bytes 179/42
-#define SYNC1 179
-#define SYNC0 42
-#define MDMCFG2 0x02 //16bit sync word / 16bit specific
+// #define STARTBYTE 2 //relevant data starts 2 bytes after the sync pattern bytes 179/42
+// #define SYNC1 179
+// #define SYNC0 42
+// #define MDMCFG2 0x02 //16bit sync word / 16bit specific
 
 // default constructor
 IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
@@ -68,18 +69,18 @@ void IthoCC1101::initSendMessage(uint8_t len)
 
   /*
     Configuration reverse engineered from remote print. The commands below are used by IthoDaalderop.
-    Base frequency    868.299866MHz
-    Channel       0
-    Channel spacing   199.951172kHz
-    Carrier frequency 868.299866MHz
-    Xtal frequency    26.000000MHz
-    Data rate     38.3835kBaud
-    Manchester      disabled
-    Modulation      2-FSK
-    Deviation     50.781250kHz
-    TX power      ?
-    PA ramping      enabled
-    Whitening     disabled
+    Base frequency      868.299866MHz
+    Channel             0
+    Channel spacing     199.951172kHz
+    Carrier frequency   868.299866MHz
+    Xtal frequency      26.000000MHz
+    Data rate           38.3835kBaud
+    Manchester          disabled
+    Modulation          2-FSK
+    Deviation           50.781250kHz
+    TX power            ?
+    PA ramping          enabled
+    Whitening           disabled
   */
   writeCommand(CC1101_SRES);
   delayMicroseconds(1);
@@ -157,19 +158,19 @@ void IthoCC1101::initReceive()
   /*
     Configuration reverse engineered from RFT print.
 
-    Base frequency    868.299866MHz
-    Channel       0
-    Channel spacing   199.951172kHz
-    Carrier frequency 868.299866MHz
-    Xtal frequency    26.000000MHz
-    Data rate     38.3835kBaud
-    RX filter BW    325.000000kHz
-    Manchester      disabled
-    Modulation      2-FSK
-    Deviation     50.781250kHz
-    TX power      0x6F,0x26,0x2E,0x7F,0x8A,0x84,0xCA,0xC4
-    PA ramping      enabled
-    Whitening     disabled
+    Base frequency      868.299866MHz
+    Channel             0
+    Channel spacing     199.951172kHz
+    Carrier frequency   868.299866MHz
+    Xtal frequency      26.000000MHz
+    Data rate           38.3835kBaud
+    RX filter BW        325.000000kHz
+    Manchester          disabled
+    Modulation          2-FSK
+    Deviation           50.781250kHz
+    TX power            0x6F,0x26,0x2E,0x7F,0x8A,0x84,0xCA,0xC4
+    PA ramping          enabled
+    Whitening           disabled
   */
   writeCommand(CC1101_SRES);
 
@@ -283,7 +284,9 @@ bool IthoCC1101::checkForNewPacket() {
 
 bool IthoCC1101::parseMessageCommand() {
 
-  messageDecode(&inMessage, &inIthoPacket);
+  bool valid = messageDecode(&inMessage, &inIthoPacket);
+  if (!valid)
+    return false;
 
   //deviceType of message type?
   inIthoPacket.deviceType  = inIthoPacket.dataDecoded[0];
@@ -644,7 +647,6 @@ uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
     packet->data[i] = 0;
   }
 
-  //Serial.println();
   for (uint8_t dataByte = 0; dataByte < itho->length; dataByte++) {
     for (uint8_t dataBit = 0; dataBit < 8; dataBit++) {                                     //process a full dataByte at a time resulting in 20 output bits (2.5 bytes) with the pattern 7x6x5x4x 10 3x2x1x0x 10 7x6x5x4x 10 3x2x1x0x 10 etc
       if (out_bitcounter == 8) {                                                            //check if new byte is needed
@@ -702,8 +704,109 @@ uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
   return out_bytecounter;
 }
 
+void print_buffer(uint8_t *data, uint8_t len, const char* tag) {
+  Serial.printf("%s: {%d} ", tag, 8*len);
+  for (uint8_t i = 0; i < len; i++)
+    Serial.printf("%02x ", data[i]);
+  Serial.println();
+}
 
-void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
+static int decode_10to8(uint8_t const *b, int pos, int end, uint8_t *out)
+{
+    // we need 10 bits
+    if (pos + 10 > end)
+        return -1;
+
+    // start bit of 0
+    if (bitrow_get_bit(b, pos) != 0)
+        return -2;
+
+    // stop bit of 1
+    if (bitrow_get_bit(b, pos + 9) != 1)
+        return -3;
+
+    *out = bitrow_get_byte(b, pos + 1);
+
+    return 10;
+}
+
+bool IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
+  // create a bit buffer
+  // TODO: view?
+  bitbuffer_t bitbuffer = {0};
+  for (int i = 0; i < packet->length; i++) {
+    for (int j = 7; j >= 0; j--) {
+      bitbuffer_add_bit(&bitbuffer, packet->data[i] >> j & 0b01);
+    }
+  }
+  bitbuffer_print(&bitbuffer);
+
+  // preamble=0x55 0xFF 0x00
+  // preamble with start/stop bits=0101010101 0111111111 0000000001
+  //                              =0101 0101 0101 1111 1111 0000 0000 01
+  //                            =0x   5    5    5    F    F    0    0 4
+  //
+  // however, part is already consumed by sync pattern
+  //                                               1111 1110 0000 0000 1
+  //                            =0x                   F    E    0    0 8
+  const uint8_t preamble_pattern[3] = { 0xFE, 0x00, 0x80 };
+  const uint8_t preamble_bit_length = 17;
+  const int row = 0; // we expect a single row only.
+
+  int preamble_start = bitbuffer_search(&bitbuffer, row, 0, preamble_pattern, preamble_bit_length);
+  int start = preamble_start + preamble_bit_length;
+  int len = bitbuffer.bits_per_row[row] - start;
+  Serial.printf("preamble_start: %d, start: %d, len: %d\n", preamble_start, start, len);
+  bitbuffer_print(&bitbuffer);
+  if (len < 8)
+      return false;
+  int end = start + len;
+
+  bitbuffer_t bytes = {0};
+  int pos = start;
+  while (pos < end) {
+      uint8_t byte = 0;
+      if (decode_10to8(bitbuffer.bb[row], pos, end, &byte) != 10)
+          break;
+      for (unsigned i = 0; i < 8; i++)
+          bitbuffer_add_bit(&bytes, (byte >> i) & 0x1);
+      pos += 10;
+  }
+  bitbuffer_print(&bytes);
+
+  // Skip Manchester breaking header
+  uint8_t header[3] = { 0x33, 0x55, 0x53 };
+  if (bitrow_get_byte(bytes.bb[row], 0) != header[0] ||
+      bitrow_get_byte(bytes.bb[row], 8) != header[1] ||
+      bitrow_get_byte(bytes.bb[row], 16) != header[2])
+      return false;
+
+  // Find Footer 0x35 (0x55*)
+  int fi = bytes.bits_per_row[row] - 8;
+  int seen_aa = 0;
+  while (bitrow_get_byte(bytes.bb[row], fi) == 0x55) {
+      seen_aa = 1;
+      fi -= 8;
+  }
+  if (bitrow_get_byte(bytes.bb[row], fi) != 0x35)
+      return false;
+
+  unsigned first_byte = 24;
+  unsigned end_byte   = fi;
+  unsigned num_bits   = end_byte - first_byte;
+  //unsigned num_bytes = num_bits/8 / 2;
+
+  bitbuffer_t output = {0};
+  unsigned fpos = bitbuffer_manchester_decode(&bytes, row, first_byte, &output, num_bits);
+  unsigned man_errors = num_bits - (fpos - first_byte - 2);
+
+  Serial.printf("without header/footer, manchester decoded: ");
+  bitbuffer_print(&output);
+
+  // old
+
+
+  print_buffer(packet->data, packet->length, "raw data");
 
   itho->length = 0;
   int lenInbuf = packet->length;
@@ -718,6 +821,22 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
     itho->length++;
   }
 
+  // int man_errors = 0;
+  // for (int i = STARTBYTE; i < packet->length; i++) {
+  //   itho->dataDecoded[i-STARTBYTE] = 0;
+  //   uint8_t x = packet->data[i];   //select input byte
+  //   Serial.printf("Byte %d: 0x%02x\n", i, x);
+  //   for (int j = 3; j >= 0; j--) {  //process bits in reverse order
+  //     int out_j = 3 - j;
+  //     int val = x >> (2*j) & 0b11;       //select bits
+  //     Serial.printf("Bite %d: 0x%01x\n", j, val);
+  //     if (val == 1)
+  //       itho->dataDecoded[i-STARTBYTE] |= 1 << out_j;
+  //     //else if (val == 01)
+  //   }
+  // }
+  // print_buffer(itho->dataDecoded, itho->length, "test data");
+
   for (int i = 0; i < sizeof(itho->dataDecoded) / sizeof(itho->dataDecoded[0]); i++) {
     itho->dataDecoded[i] = 0;
   }
@@ -731,9 +850,9 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
   uint8_t out_j_chk = 4;                              //bit index
   uint8_t in_bitcounter = 0;                          //process per 10 input bits
 
-  for (int i = STARTBYTE; i < packet->length; i++) {
 
-    for (int j = 7; j > -1; j--) {
+  for (int i = STARTBYTE; i < packet->length; i++) {
+    for (int j = 7; j >= 0; j--) {
       if (in_bitcounter == 0 || in_bitcounter == 2 || in_bitcounter == 4 || in_bitcounter == 6) { //select input bits for output
         uint8_t x = packet->data[i];   //select input byte
         x = x >> j;             //select input bit
@@ -761,6 +880,11 @@ void IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
       if (in_bitcounter > 9) in_bitcounter = 0;
     }
   }
+
+  print_buffer(itho->dataDecoded, itho->length, "decoded data");
+  print_buffer(itho->dataDecodedChk, itho->length, "redundant data");
+
+  return true;
 }
 
 uint8_t IthoCC1101::ReadRSSI()
@@ -802,34 +926,6 @@ int * IthoCC1101::getLastID() const {
   return id;
 }
 
-String IthoCC1101::getLastMessagestr(bool ashex) const {
-  String str = "Length=" + String(inMessage.length) + ".";
-  for (uint8_t i = 0; i < inMessage.length; i++) {
-    if (ashex) str += String(inMessage.data[i], HEX);
-    else str += String(inMessage.data[i]);
-    if (i < inMessage.length - 1) str += ":";
-  }
-  return str;
-}
-
-String IthoCC1101::LastMessageDecoded() const {
-  String str;
-  if (inIthoPacket.length > 11) {
-    str += "Device type?: " + String(inIthoPacket.deviceType);
-    str += " - CMD: ";
-    for (int i = 4; i < inIthoPacket.length; i++) {
-      str += String(inIthoPacket.dataDecoded[i]);
-      if (i < inIthoPacket.length - 1) str += ",";
-    }
-
-  }
-  else {
-    for (uint8_t i = 0; i < inIthoPacket.length; i++) {
-      str += String(inIthoPacket.dataDecoded[i]);
-      if (i < inIthoPacket.length - 1) str += ",";
-    }
-
-  }
-  str += "\n";
-  return str;
+CC1101Packet IthoCC1101::getLastMessage() const {
+  return inMessage;
 }
