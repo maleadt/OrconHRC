@@ -53,17 +53,17 @@ class IthoCC1101 : protected CC1101
     // initialization
     void init() { CC1101::init(); initReceive(); }                    //init,reset CC1101
     void initReceive();
-    uint8_t getLastCounter() { return outIthoPacket.counter; }        //counter is increased before sending a command
+    // uint8_t getLastCounter() { return outIthoPacket.counter; }        //counter is increased before sending a command
     void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
-    void setDeviceID(uint8_t byte0, uint8_t byte1, uint8_t byte2) { this->outIthoPacket.deviceId[0] = byte0; this->outIthoPacket.deviceId[1] = byte1; this->outIthoPacket.deviceId[2] = byte2;}
+    // void setDeviceID(uint8_t byte0, uint8_t byte1, uint8_t byte2) { this->outIthoPacket.deviceId[0] = byte0; this->outIthoPacket.deviceId[1] = byte1; this->outIthoPacket.deviceId[2] = byte2;}
 
     // receiving
     bool checkForNewPacket();                       //check RX fifo for new data
     IthoPacket getLastPacket() const { return inIthoPacket; }           //retrieve last received/parsed packet from remote
-    IthoCommand getLastCommand() const { return inIthoPacket.command; }           //retrieve last received/parsed command from remote
-    uint8_t getLastInCounter() const { return inIthoPacket.counter; }           //retrieve last received/parsed command from remote
-    int * getLastID() const;
-    String getLastIDstr(bool ashex=true) const;
+    // IthoCommand getLastCommand() const { return inIthoPacket.command; }           //retrieve last received/parsed command from remote
+    // uint8_t getLastInCounter() const { return inIthoPacket.counter; }           //retrieve last received/parsed command from remote
+    // int * getLastID() const;
+    // String getLastIDstr(bool ashex=true) const;
     CC1101Packet getLastMessage() const;
     String LastMessageDecoded() const;
 
@@ -86,7 +86,7 @@ class IthoCC1101 : protected CC1101
 
     //parse received message
     bool parseMessageCommand();
-    bool checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]);
+    // bool checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]);
 
     // sending
     void createMessageStart(IthoPacket *itho, CC1101Packet *packet);
@@ -97,7 +97,7 @@ class IthoCC1101 : protected CC1101
     uint8_t getCounter2(IthoPacket *itho, uint8_t len);
 
     uint8_t messageEncode(IthoPacket *itho, CC1101Packet *packet);
-    bool messageDecode(CC1101Packet *packet, IthoPacket *itho);
+    int messageDecode(CC1101Packet *packet, IthoPacket *itho);
 
     //receive
     CC1101Packet inMessage;                       //temp storage message2

@@ -43,14 +43,14 @@
 // default constructor
 IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 {
-  this->outIthoPacket.counter = counter;
-  this->sendTries = sendTries;
+  // this->outIthoPacket.counter = counter;
+  // this->sendTries = sendTries;
 
-  this->outIthoPacket.deviceId[0] = 33;
-  this->outIthoPacket.deviceId[1] = 66;
-  this->outIthoPacket.deviceId[2] = 99;
+  // this->outIthoPacket.deviceId[0] = 33;
+  // this->outIthoPacket.deviceId[1] = 66;
+  // this->outIthoPacket.deviceId[2] = 99;
 
-  this->outIthoPacket.deviceType = 22;
+  // this->outIthoPacket.deviceType = 22;
 
 } //IthoCC1101
 
@@ -282,11 +282,96 @@ bool IthoCC1101::checkForNewPacket() {
   return false;
 }
 
-bool IthoCC1101::parseMessageCommand() {
+int add_bytes(uint8_t const message[], unsigned num_bytes)
+{
+    int result = 0;
+    for (unsigned i = 0; i < num_bytes; ++i) {
+        result += message[i];
+    }
+    return result;
+}
 
-  bool valid = messageDecode(&inMessage, &inIthoPacket);
-  if (!valid)
+/** Decoders should return n>0 for n packets successfully decoded,
+    an ABORT code if the bitbuffer is no applicable,
+    or a FAIL code if the message is malformed. */
+enum decode_return_codes {
+    DECODE_FAIL_OTHER   = 0, ///< legacy, do not use
+    /** Bitbuffer row count or row length is wrong for this sensor. */
+    DECODE_ABORT_LENGTH = -1,
+    DECODE_ABORT_EARLY  = -2,
+    /** Message Integrity Check failed: e.g. checksum/CRC doesn't validate. */
+    DECODE_FAIL_MIC     = -3,
+    DECODE_FAIL_SANITY  = -4,
+};
+
+static uint8_t next(const uint8_t *bb, unsigned *ipos, unsigned num_bytes)
+{
+    uint8_t r = bitrow_get_byte(bb, *ipos);
+    *ipos += 8;
+    if (*ipos >= num_bytes * 8)
+        return DECODE_FAIL_SANITY;
+    return r;
+}
+
+bool IthoCC1101::parseMessageCommand() {
+  bitbuffer_clear(&inIthoPacket.bits);
+
+  int pr = messageDecode(&inMessage, &inIthoPacket);
+  if (pr <= 0)
     return false;
+
+  // TODO: only populate IthoPacket here; shouldn't contain the bits
+  bitbuffer_t *bmsg = &inIthoPacket.bits;
+  IthoPacket *msg = &inIthoPacket;
+  const int row = 1;
+
+  if (!bmsg || row >= bmsg->num_rows || bmsg->bits_per_row[row] < 8)
+    return DECODE_ABORT_LENGTH;
+
+  unsigned num_bytes = bmsg->bits_per_row[0]/8;
+  unsigned num_bits = bmsg->bits_per_row[0];
+  unsigned ipos = 0;
+  const uint8_t *bb = bmsg->bb[row];
+
+  // Checksum: All bytes add up to 0.
+  int bsum = add_bytes(bb, num_bytes) & 0xff;
+  int checksum_ok = bsum == 0;
+  msg->crc = bitrow_get_byte(bb, bmsg->bits_per_row[row] - 8);
+  if (!checksum_ok)
+      return DECODE_FAIL_MIC;
+
+  msg->header = next(bb, &ipos, num_bytes);
+
+  msg->num_device_ids = msg->header == 0x14 ? 1 :
+                        msg->header == 0x18 ? 2 :
+                        msg->header == 0x1c ? 2 :
+                        msg->header == 0x10 ? 2 :
+                        msg->header == 0x3c ? 2 :
+              (msg->header >> 2) & 0x03; // total speculation.
+
+  for (unsigned i = 0; i < msg->num_device_ids; i++)
+      for (unsigned j = 0; j < 3; j++)
+          msg->device_id[i][j] = next(bb, &ipos, num_bytes);
+
+  msg->command = (next(bb, &ipos, num_bytes) << 8) | next(bb, &ipos, num_bytes);
+  msg->payload_length = next(bb, &ipos, num_bytes);
+
+  for (unsigned i = 0; i < msg->payload_length; i++)
+      msg->payload[i] = next(bb, &ipos, num_bytes);
+
+  if (ipos < num_bits - 8)
+  {
+    unsigned num_unparsed_bits = (bmsg->bits_per_row[row] - 8) - ipos;
+    msg->unparsed_length = (num_unparsed_bits / 8) + (num_unparsed_bits % 8) ? 1 : 0;
+    if (msg->unparsed_length != 0)
+        bitbuffer_extract_bytes(bmsg, row, ipos, msg->unparsed, num_unparsed_bits);
+  }
+
+  // TODO: return ipos instead of true?
+
+  // old
+
+  /*
 
   //deviceType of message type?
   inIthoPacket.deviceType  = inIthoPacket.dataDecoded[0];
@@ -353,27 +438,31 @@ bool IthoCC1101::parseMessageCommand() {
   }
 #endif
 
+*/
+
   return true;
 }
 
-bool IthoCC1101::checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]) {
-  uint8_t offset = 0;
-  if (itho->deviceType == 28 || itho->deviceType == 24) offset = 2;
-  for (int i = 4; i < 6; i++)
-  {
-    //if (i == 2 || i == 3) continue; //skip byte3 and byte4, rft-rv and co2-auto remote device seem to sometimes have a different number there
-    if ( (itho->dataDecoded[i + 5 + offset] != commandBytes[i]) && (itho->dataDecodedChk[i + 5 + offset] != commandBytes[i]) ) {
-      return false;
-    }
-  }
-  return true;
-}
+// bool IthoCC1101::checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]) {
+//   uint8_t offset = 0;
+//   if (itho->deviceType == 28 || itho->deviceType == 24) offset = 2;
+//   for (int i = 4; i < 6; i++)
+//   {
+//     //if (i == 2 || i == 3) continue; //skip byte3 and byte4, rft-rv and co2-auto remote device seem to sometimes have a different number there
+//     if ( (itho->dataDecoded[i + 5 + offset] != commandBytes[i]) && (itho->dataDecodedChk[i + 5 + offset] != commandBytes[i]) ) {
+//       return false;
+//     }
+//   }
+//   return true;
+// }
 
 void IthoCC1101::sendCommand(IthoCommand command)
 {
   CC1101Packet outMessage;
   uint8_t maxTries = sendTries;
   uint8_t delaytime = 40;
+
+  /*
 
   //update itho packet data
   outIthoPacket.command = command;
@@ -397,6 +486,8 @@ void IthoCC1101::sendCommand(IthoCommand command)
       createMessageCommand(&outIthoPacket, &outMessage);
       break;
   }
+
+  */
 
   //send messages
   for (int i = 0; i < maxTries; i++)
@@ -434,7 +525,7 @@ void IthoCC1101::createMessageStart(IthoPacket *itho, CC1101Packet *packet)
 
 void IthoCC1101::createMessageCommand(IthoPacket *itho, CC1101Packet *packet)
 {
-
+/*
   //set start message structure
   createMessageStart(itho, packet);
 
@@ -472,12 +563,13 @@ void IthoCC1101::createMessageCommand(IthoPacket *itho, CC1101Packet *packet)
     packet->data[i] = 170;
   }
   packet->length += 7;
+  */
 
 }
 
 void IthoCC1101::createMessageJoin(IthoPacket *itho, CC1101Packet *packet)
 {
-
+/*
   //set start message structure
   createMessageStart(itho, packet);
 
@@ -529,12 +621,12 @@ void IthoCC1101::createMessageJoin(IthoPacket *itho, CC1101Packet *packet)
     packet->data[i] = 170;
   }
   packet->length += 7;
-
+*/
 }
 
 void IthoCC1101::createMessageLeave(IthoPacket *itho, CC1101Packet *packet)
 {
-
+/*
   //set start message structure
   createMessageStart(itho, packet);
 
@@ -577,7 +669,7 @@ void IthoCC1101::createMessageLeave(IthoPacket *itho, CC1101Packet *packet)
     packet->data[i] = 170;
   }
   packet->length += 7;
-
+*/
 }
 
 uint8_t* IthoCC1101::getMessageCommandBytes(IthoCommand command)
@@ -614,6 +706,7 @@ uint8_t* IthoCC1101::getMessageCommandBytes(IthoCommand command)
    deviceType up to the last byte before counter2 subtracted
    from zero.
 */
+/*
 uint8_t IthoCC1101::getCounter2(IthoPacket *itho, uint8_t len) {
 
   uint8_t val = 0;
@@ -624,9 +717,11 @@ uint8_t IthoCC1101::getCounter2(IthoPacket *itho, uint8_t len) {
 
   return 0 - val;
 }
+*/
 
 uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
 
+/*
   uint8_t lenOutbuf = 0;
 
   if ((itho->length * 20) % 8 == 0) { //inData len fits niecly in out buffer length
@@ -702,6 +797,10 @@ uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
   }
 
   return out_bytecounter;
+
+  */
+
+  return 0;
 }
 
 void print_buffer(uint8_t *data, uint8_t len, const char* tag) {
@@ -711,26 +810,27 @@ void print_buffer(uint8_t *data, uint8_t len, const char* tag) {
   Serial.println();
 }
 
+
 static int decode_10to8(uint8_t const *b, int pos, int end, uint8_t *out)
 {
     // we need 10 bits
     if (pos + 10 > end)
-        return -1;
+        return DECODE_ABORT_LENGTH;
 
     // start bit of 0
     if (bitrow_get_bit(b, pos) != 0)
-        return -2;
+        return DECODE_FAIL_SANITY;
 
     // stop bit of 1
     if (bitrow_get_bit(b, pos + 9) != 1)
-        return -3;
+        return DECODE_FAIL_SANITY;
 
     *out = bitrow_get_byte(b, pos + 1);
 
     return 10;
 }
 
-bool IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
+int IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
   // create a bit buffer
   // TODO: view?
   bitbuffer_t bitbuffer = {0};
@@ -739,7 +839,6 @@ bool IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
       bitbuffer_add_bit(&bitbuffer, packet->data[i] >> j & 0b01);
     }
   }
-  bitbuffer_print(&bitbuffer);
 
   // preamble=0x55 0xFF 0x00
   // preamble with start/stop bits=0101010101 0111111111 0000000001
@@ -756,10 +855,8 @@ bool IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
   int preamble_start = bitbuffer_search(&bitbuffer, row, 0, preamble_pattern, preamble_bit_length);
   int start = preamble_start + preamble_bit_length;
   int len = bitbuffer.bits_per_row[row] - start;
-  Serial.printf("preamble_start: %d, start: %d, len: %d\n", preamble_start, start, len);
-  bitbuffer_print(&bitbuffer);
   if (len < 8)
-      return false;
+      return DECODE_ABORT_LENGTH;
   int end = start + len;
 
   bitbuffer_t bytes = {0};
@@ -772,14 +869,13 @@ bool IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
           bitbuffer_add_bit(&bytes, (byte >> i) & 0x1);
       pos += 10;
   }
-  bitbuffer_print(&bytes);
 
   // Skip Manchester breaking header
   uint8_t header[3] = { 0x33, 0x55, 0x53 };
   if (bitrow_get_byte(bytes.bb[row], 0) != header[0] ||
       bitrow_get_byte(bytes.bb[row], 8) != header[1] ||
       bitrow_get_byte(bytes.bb[row], 16) != header[2])
-      return false;
+      return DECODE_FAIL_SANITY;
 
   // Find Footer 0x35 (0x55*)
   int fi = bytes.bits_per_row[row] - 8;
@@ -789,102 +885,29 @@ bool IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
       fi -= 8;
   }
   if (bitrow_get_byte(bytes.bb[row], fi) != 0x35)
-      return false;
+      return DECODE_FAIL_SANITY;
 
   unsigned first_byte = 24;
   unsigned end_byte   = fi;
   unsigned num_bits   = end_byte - first_byte;
   //unsigned num_bytes = num_bits/8 / 2;
 
-  bitbuffer_t output = {0};
-  unsigned fpos = bitbuffer_manchester_decode(&bytes, row, first_byte, &output, num_bits);
+  unsigned fpos = bitbuffer_manchester_decode(&bytes, row, first_byte, &itho->bits, num_bits);
   unsigned man_errors = num_bits - (fpos - first_byte - 2);
 
-  Serial.printf("without header/footer, manchester decoded: ");
-  bitbuffer_print(&output);
+#ifndef _DEBUG
+  if (man_errors != 0)
+      return DECODE_FAIL_SANITY;
+#endif
 
-  // old
+  Serial.printf("packet: ");
+  bitbuffer_print(&itho->bits);
 
+  // for compatibility (TODO: maintain bitbuffer everywhere?)
+  // bitbuffer_extract_bytes(&itho->bits, row, 0, itho->dataDecoded, num_bits);
+  // itho->length = itho->bits.bits_per_row[row] / 8;
 
-  print_buffer(packet->data, packet->length, "raw data");
-
-  itho->length = 0;
-  int lenInbuf = packet->length;
-
-  lenInbuf -= STARTBYTE; //correct for sync byte pos
-
-  while (lenInbuf >= 5) {
-    lenInbuf -= 5;
-    itho->length += 2;
-  }
-  if (lenInbuf >= 3) {
-    itho->length++;
-  }
-
-  // int man_errors = 0;
-  // for (int i = STARTBYTE; i < packet->length; i++) {
-  //   itho->dataDecoded[i-STARTBYTE] = 0;
-  //   uint8_t x = packet->data[i];   //select input byte
-  //   Serial.printf("Byte %d: 0x%02x\n", i, x);
-  //   for (int j = 3; j >= 0; j--) {  //process bits in reverse order
-  //     int out_j = 3 - j;
-  //     int val = x >> (2*j) & 0b11;       //select bits
-  //     Serial.printf("Bite %d: 0x%01x\n", j, val);
-  //     if (val == 1)
-  //       itho->dataDecoded[i-STARTBYTE] |= 1 << out_j;
-  //     //else if (val == 01)
-  //   }
-  // }
-  // print_buffer(itho->dataDecoded, itho->length, "test data");
-
-  for (int i = 0; i < sizeof(itho->dataDecoded) / sizeof(itho->dataDecoded[0]); i++) {
-    itho->dataDecoded[i] = 0;
-  }
-  for (int i = 0; i < sizeof(itho->dataDecodedChk) / sizeof(itho->dataDecodedChk[0]); i++) {
-    itho->dataDecodedChk[i] = 0;
-  }
-
-  uint8_t out_i = 0;                                  //byte index
-  uint8_t out_j = 4;                                  //bit index
-  uint8_t out_i_chk = 0;                              //byte index
-  uint8_t out_j_chk = 4;                              //bit index
-  uint8_t in_bitcounter = 0;                          //process per 10 input bits
-
-
-  for (int i = STARTBYTE; i < packet->length; i++) {
-    for (int j = 7; j >= 0; j--) {
-      if (in_bitcounter == 0 || in_bitcounter == 2 || in_bitcounter == 4 || in_bitcounter == 6) { //select input bits for output
-        uint8_t x = packet->data[i];   //select input byte
-        x = x >> j;             //select input bit
-        x = x & 0b00000001;
-        x = x << out_j;         //set value for output bit
-        itho->dataDecoded[out_i] = itho->dataDecoded[out_i] | x;
-        out_j += 1;             //next output bit
-        if (out_j > 7) out_j = 0;
-        if (out_j == 4) out_i += 1;
-      }
-      if (in_bitcounter == 1 || in_bitcounter == 3 || in_bitcounter == 5 || in_bitcounter == 7) { //select input bits for check output
-        uint8_t x = packet->data[i];   //select input byte
-        x = x >> j;             //select input bit
-        x = x & 0b00000001;
-        x = x << out_j_chk;         //set value for output bit
-        itho->dataDecodedChk[out_i_chk] = itho->dataDecodedChk[out_i_chk] | x;
-        out_j_chk += 1;             //next output bit
-        if (out_j_chk > 7) out_j_chk = 0;
-        if (out_j_chk == 4) {
-          itho->dataDecodedChk[out_i_chk] = ~itho->dataDecodedChk[out_i_chk]; //inverse bits
-          out_i_chk += 1;
-        }
-      }
-      in_bitcounter += 1;     //continue cyling in groups of 10 bits
-      if (in_bitcounter > 9) in_bitcounter = 0;
-    }
-  }
-
-  print_buffer(itho->dataDecoded, itho->length, "decoded data");
-  print_buffer(itho->dataDecodedChk, itho->length, "redundant data");
-
-  return true;
+  return 1;
 }
 
 uint8_t IthoCC1101::ReadRSSI()
@@ -908,23 +931,23 @@ uint8_t IthoCC1101::ReadRSSI()
   return (value);
 }
 
-String IthoCC1101::getLastIDstr(bool ashex) const {
-  String str;
-  for (uint8_t i = 0; i < 3; i++) {
-    if (ashex) str += String(inIthoPacket.deviceId[i], HEX);
-    else str += String(inIthoPacket.deviceId[i]);
-    if (i < 2) str += ",";
-  }
-  return str;
-}
+// String IthoCC1101::getLastIDstr(bool ashex) const {
+//   String str;
+//   for (uint8_t i = 0; i < 3; i++) {
+//     if (ashex) str += String(inIthoPacket.deviceId[i], HEX);
+//     else str += String(inIthoPacket.deviceId[i]);
+//     if (i < 2) str += ",";
+//   }
+//   return str;
+// }
 
-int * IthoCC1101::getLastID() const {
-  static int id[3];
-  for (uint8_t i = 0; i < 3; i++) {
-    id[i] = inIthoPacket.deviceId[i];
-  }
-  return id;
-}
+// int * IthoCC1101::getLastID() const {
+//   static int id[3];
+//   for (uint8_t i = 0; i < 3; i++) {
+//     id[i] = inIthoPacket.deviceId[i];
+//   }
+//   return id;
+// }
 
 CC1101Packet IthoCC1101::getLastMessage() const {
   return inMessage;

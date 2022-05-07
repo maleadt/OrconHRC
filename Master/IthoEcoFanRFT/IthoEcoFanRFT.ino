@@ -47,7 +47,7 @@ void setup(void) {
   delay(500);
 
   Serial.println("Initialization");
-  rf.setDeviceID(130, 11, 156);
+  // rf.setDeviceID(130, 11, 156);
   rf.init();
 
   //Serial.println("Registering");
@@ -63,7 +63,7 @@ bool has_packet = false;
 void loop(void) {
   // if (has_packet) {
     if (rf.checkForNewPacket()) {
-      IthoCommand cmd = rf.getLastCommand();
+      // IthoCommand cmd = rf.getLastCommand();
       //if ((cmd != IthoUnknown)) {  // only act on good cmd
         showPacket(rf);
       //}
