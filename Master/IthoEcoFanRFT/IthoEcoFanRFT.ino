@@ -32,15 +32,15 @@
 */
 
 #include <SPI.h>
-#include "IthoCC1101.h"
-#include "IthoPacket.h"
+#include "RAMSES.h"
+#include "RAMSESMessage.h"
 
 #define ITHO_IRQ_PIN 22 // pin 17 / D22
 
-IthoCC1101 rf;
+Orcon rf;
 
 ICACHE_RAM_ATTR void ITHOcheck();
-void showPacket(const IthoCC1101 &rf);
+void showPacket(const Orcon &rf);
 
 void setup(void) {
   Serial.begin(115200);
@@ -87,51 +87,9 @@ const char *int_to_binary_str(int x, int N_bits){
     return b;
 }
 
-void showPacket(const IthoCC1101 &rf) { // TODO: const
-  IthoPacket packet = rf.getLastPacket();
-  CC1101Packet message = rf.getLastMessage();
+void showPacket(const Orcon &rf) { // TODO: const
+  RAMSESMessage message = rf.getLastMessage();
+  CC1101Packet packet = rf.getLastPacket();
 
   Serial.println();
-}
-
-void sendRegister() {
-  Serial.println("sending join...");
-  rf.sendCommand(IthoJoin);
-  Serial.println("sending join done.");
-}
-
-void sendStandbySpeed() {
-  Serial.println("sending standby...");
-  rf.sendCommand(IthoStandby);
-  Serial.println("sending standby done.");
-}
-
-void sendLowSpeed() {
-  Serial.println("sending low...");
-  rf.sendCommand(IthoLow);
-  Serial.println("sending low done.");
-}
-
-void sendMediumSpeed() {
-  Serial.println("sending medium...");
-  rf.sendCommand(IthoMedium);
-  Serial.println("sending medium done.");
-}
-
-void sendHighSpeed() {
-  Serial.println("sending high...");
-  rf.sendCommand(IthoHigh);
-  Serial.println("sending high done.");
-}
-
-void sendFullSpeed() {
-  Serial.println("sending FullSpeed...");
-  rf.sendCommand(IthoFull);
-  Serial.println("sending FullSpeed done.");
-}
-
-void sendTimer() {
-  Serial.println("sending timer...");
-  rf.sendCommand(IthoTimer1);
-  Serial.println("sending timer done.");
 }

@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 #include "CC1101.h"
-#include "IthoPacket.h"
+#include "RAMSESMessage.h"
 
 
 //pa table settings
@@ -44,11 +44,11 @@ const uint8_t ithoMessageLeaveCommandBytes[] =    {31,201,6,0,31,201};
 //151,149,65,31,201,24,0,49,224,151,149,65,0,18,160,151,149,65,1,16,224
 
 
-class IthoCC1101 : protected CC1101
+class Orcon : protected CC1101
 {
   public:
-    IthoCC1101(uint8_t counter = 0, uint8_t sendTries = 3);   //set initial counter value
-    ~IthoCC1101() {};
+    Orcon(uint8_t counter = 0, uint8_t sendTries = 3);   //set initial counter value
+    ~Orcon() {};
 
     // initialization
     void init() { CC1101::init(); initReceive(); }                    //init,reset CC1101
@@ -59,23 +59,23 @@ class IthoCC1101 : protected CC1101
 
     // receiving
     bool checkForNewPacket();                       //check RX fifo for new data
-    IthoPacket getLastPacket() const { return inIthoPacket; }           //retrieve last received/parsed packet from remote
-    // IthoCommand getLastCommand() const { return inIthoPacket.command; }           //retrieve last received/parsed command from remote
-    // uint8_t getLastInCounter() const { return inIthoPacket.counter; }           //retrieve last received/parsed command from remote
+    RAMSESMessage getLastMessage() const { return inOrconMessage; }           //retrieve last received/parsed packet from remote
+    // IthoCommand getLastCommand() const { return inOrconMessage.command; }           //retrieve last received/parsed command from remote
+    // uint8_t getLastInCounter() const { return inOrconMessage.counter; }           //retrieve last received/parsed command from remote
     // int * getLastID() const;
     // String getLastIDstr(bool ashex=true) const;
-    CC1101Packet getLastMessage() const;
+    CC1101Packet getLastPacket() const;
     String LastMessageDecoded() const;
 
     // sending
-    void sendCommand(IthoCommand command);
+    // void sendCommand(IthoCommand command);
 
     // other
     uint8_t ReadRSSI();
 
   private:
-    IthoCC1101( const IthoCC1101 &c);
-    IthoCC1101& operator=( const IthoCC1101 &c);
+    Orcon( const Orcon &c);
+    Orcon& operator=( const Orcon &c);
 
     //init CC1101 for receiving
     void initReceiveMessage();
@@ -88,29 +88,29 @@ class IthoCC1101 : protected CC1101
     int decodeMessage();
     int parseMessage();
     int interpretMessage();
-    // bool checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]);
+    // bool checkIthoCommand(RAMSESMessage *itho, const uint8_t commandBytes[]);
 
     // sending
-    void createMessageStart(IthoPacket *itho, CC1101Packet *packet);
-    void createMessageCommand(IthoPacket *itho, CC1101Packet *packet);
-    void createMessageJoin(IthoPacket *itho, CC1101Packet *packet);
-    void createMessageLeave(IthoPacket *itho, CC1101Packet *packet);
-    uint8_t* getMessageCommandBytes(IthoCommand command);
-    uint8_t getCounter2(IthoPacket *itho, uint8_t len);
+    void createMessageStart(RAMSESMessage *itho, CC1101Packet *packet);
+    void createMessageCommand(RAMSESMessage *itho, CC1101Packet *packet);
+    void createMessageJoin(RAMSESMessage *itho, CC1101Packet *packet);
+    void createMessageLeave(RAMSESMessage *itho, CC1101Packet *packet);
+    // uint8_t* getMessageCommandBytes(IthoCommand command);
+    uint8_t getCounter2(RAMSESMessage *itho, uint8_t len);
 
-    uint8_t messageEncode(IthoPacket *itho, CC1101Packet *packet);
-    int messageDecode(CC1101Packet *packet, IthoPacket *itho);
+    uint8_t messageEncode(RAMSESMessage *itho, CC1101Packet *packet);
+    int messageDecode(CC1101Packet *packet, RAMSESMessage *itho);
 
     //receive
     CC1101Packet inMessage;                       //temp storage message2
-    IthoPacket inIthoPacket;                        //stores last received message data
+    RAMSESMessage inOrconMessage;                        //stores last received message data
 
     //send
-    IthoPacket outIthoPacket;                       //stores state of "remote"
+    RAMSESMessage outIthoPacket;                       //stores state of "remote"
 
     //settings
     uint8_t sendTries;                            //number of times a command is send at one button press
 
-}; //IthoCC1101
+}; //Orcon
 
 #endif //__ITHOCC1101_H__

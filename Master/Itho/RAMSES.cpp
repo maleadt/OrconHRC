@@ -14,7 +14,7 @@
   (byte & 0x02 ? '1' : '0'), \
   (byte & 0x01 ? '1' : '0')
 
-#include "IthoCC1101.h"
+#include "RAMSES.h"
 #include "bitbuffer.h"
 #include <string.h>
 #include <Arduino.h>
@@ -41,7 +41,7 @@
 // #define MDMCFG2 0x02 //16bit sync word / 16bit specific
 
 // default constructor
-IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
+Orcon::Orcon(uint8_t counter, uint8_t sendTries) : CC1101()
 {
   // this->outIthoPacket.counter = counter;
   // this->sendTries = sendTries;
@@ -52,9 +52,9 @@ IthoCC1101::IthoCC1101(uint8_t counter, uint8_t sendTries) : CC1101()
 
   // this->outIthoPacket.deviceType = 22;
 
-} //IthoCC1101
+} //Orcon
 
-void IthoCC1101::initSendMessage(uint8_t len)
+void Orcon::initSendMessage(uint8_t len)
 {
   //finishTransfer();
   writeCommand(CC1101_SIDLE);
@@ -141,7 +141,7 @@ void IthoCC1101::initSendMessage(uint8_t len)
 
 }
 
-void IthoCC1101::finishTransfer()
+void Orcon::finishTransfer()
 {
   writeCommand(CC1101_SIDLE);
   delayMicroseconds(1);
@@ -153,7 +153,7 @@ void IthoCC1101::finishTransfer()
   writeCommand(CC1101_SPWD);
 }
 
-void IthoCC1101::initReceive()
+void Orcon::initReceive()
 {
   /*
     Configuration reverse engineered from RFT print.
@@ -243,7 +243,7 @@ void IthoCC1101::initReceive()
   initReceiveMessage();
 }
 
-void  IthoCC1101::initReceiveMessage()
+void  Orcon::initReceiveMessage()
 {
   uint8_t marcState;
 
@@ -274,7 +274,7 @@ void  IthoCC1101::initReceiveMessage()
   }
 }
 
-bool IthoCC1101::checkForNewPacket() {
+bool Orcon::checkForNewPacket() {
   if (receiveData(&inMessage, 63) && decodeMessage() > 0) {
     int err = parseMessage();
     if (err <= 0) {
@@ -325,20 +325,20 @@ static uint8_t next(const uint8_t *bb, unsigned *ipos, unsigned num_bytes)
     return r;
 }
 
-int IthoCC1101::decodeMessage() {
-  bitbuffer_clear(&inIthoPacket.bits);
+int Orcon::decodeMessage() {
+  bitbuffer_clear(&inOrconMessage.bits);
 
-  int pr = messageDecode(&inMessage, &inIthoPacket);
+  int pr = messageDecode(&inMessage, &inOrconMessage);
   if (pr <= 0)
     return pr;
 
   return 1;
 }
 
-int IthoCC1101::parseMessage() {
-  // TODO: only populate IthoPacket here; shouldn't contain the bits
-  bitbuffer_t *bmsg = &inIthoPacket.bits;
-  IthoPacket *msg = &inIthoPacket;
+int Orcon::parseMessage() {
+  // TODO: only populate Message here; shouldn't contain the bits
+  bitbuffer_t *bmsg = &inOrconMessage.bits;
+  RAMSESMessage *msg = &inOrconMessage;
   const int row = 0;
 
   if (!bmsg || row >= bmsg->num_rows || bmsg->bits_per_row[row] < 8)
@@ -394,13 +394,13 @@ enum fan_setting {
     FAN_AUTO = 4
 };
 
-int IthoCC1101::interpretMessage() {
-  Serial.println("IthoCC1101::interpretMessage");
-  bitbuffer_t *bmsg = &inIthoPacket.bits;
-  IthoPacket *msg = &inIthoPacket;
+int Orcon::interpretMessage() {
+  Serial.println("Orcon::interpretMessage");
+  bitbuffer_t *bmsg = &inOrconMessage.bits;
+  RAMSESMessage *msg = &inOrconMessage;
   const int row = 0;
 
-  Serial.printf("- num_device_ids: %d\n", inIthoPacket.num_device_ids);
+  Serial.printf("- num_device_ids: %d\n", inOrconMessage.num_device_ids);
   for (unsigned i = 0; i < msg->num_device_ids; i++) {
       Serial.printf("  %02x%02x%02x\n",
                     msg->device_id[i][0],
@@ -479,55 +479,55 @@ int IthoCC1101::interpretMessage() {
   return 1;
 }
 
-void IthoCC1101::sendCommand(IthoCommand command)
-{
-  CC1101Packet outMessage;
-  uint8_t maxTries = sendTries;
-  uint8_t delaytime = 40;
+// void Orcon::sendCommand(IthoCommand command)
+// {
+//   CC1101Packet outMessage;
+//   uint8_t maxTries = sendTries;
+//   uint8_t delaytime = 40;
 
-  /*
+//   /*
 
-  //update itho packet data
-  outIthoPacket.command = command;
-  outIthoPacket.counter += 1;
+//   //update itho packet data
+//   outIthoPacket.command = command;
+//   outIthoPacket.counter += 1;
 
-  //get message2 bytes
-  switch (command)
-  {
-    case IthoJoin:
-      createMessageJoin(&outIthoPacket, &outMessage);
-      break;
+//   //get message2 bytes
+//   switch (command)
+//   {
+//     case IthoJoin:
+//       createMessageJoin(&outIthoPacket, &outMessage);
+//       break;
 
-    case IthoLeave:
-      createMessageLeave(&outIthoPacket, &outMessage);
-      //the leave command needs to be transmitted for 1 second according the manual
-      maxTries = 30;
-      delaytime = 4;
-      break;
+//     case IthoLeave:
+//       createMessageLeave(&outIthoPacket, &outMessage);
+//       //the leave command needs to be transmitted for 1 second according the manual
+//       maxTries = 30;
+//       delaytime = 4;
+//       break;
 
-    default:
-      createMessageCommand(&outIthoPacket, &outMessage);
-      break;
-  }
+//     default:
+//       createMessageCommand(&outIthoPacket, &outMessage);
+//       break;
+//   }
 
-  */
+//   */
 
-  //send messages
-  for (int i = 0; i < maxTries; i++)
-  {
+//   //send messages
+//   for (int i = 0; i < maxTries; i++)
+//   {
 
-    //message2
-    initSendMessage(outMessage.length);
-    sendData(&outMessage);
+//     //message2
+//     initSendMessage(outMessage.length);
+//     sendData(&outMessage);
 
-    finishTransfer();
-    delay(delaytime);
-  }
-  initReceive();
-}
+//     finishTransfer();
+//     delay(delaytime);
+//   }
+//   initReceive();
+// }
 
 
-void IthoCC1101::createMessageStart(IthoPacket *itho, CC1101Packet *packet)
+void Orcon::createMessageStart(RAMSESMessage *itho, CC1101Packet *packet)
 {
 
   //fixed, set start structure in data buffer manually
@@ -546,7 +546,7 @@ void IthoCC1101::createMessageStart(IthoPacket *itho, CC1101Packet *packet)
 
 }
 
-void IthoCC1101::createMessageCommand(IthoPacket *itho, CC1101Packet *packet)
+void Orcon::createMessageCommand(RAMSESMessage *itho, CC1101Packet *packet)
 {
 /*
   //set start message structure
@@ -590,7 +590,7 @@ void IthoCC1101::createMessageCommand(IthoPacket *itho, CC1101Packet *packet)
 
 }
 
-void IthoCC1101::createMessageJoin(IthoPacket *itho, CC1101Packet *packet)
+void Orcon::createMessageJoin(RAMSESMessage *itho, CC1101Packet *packet)
 {
 /*
   //set start message structure
@@ -647,7 +647,7 @@ void IthoCC1101::createMessageJoin(IthoPacket *itho, CC1101Packet *packet)
 */
 }
 
-void IthoCC1101::createMessageLeave(IthoPacket *itho, CC1101Packet *packet)
+void Orcon::createMessageLeave(RAMSESMessage *itho, CC1101Packet *packet)
 {
 /*
   //set start message structure
@@ -695,34 +695,34 @@ void IthoCC1101::createMessageLeave(IthoPacket *itho, CC1101Packet *packet)
 */
 }
 
-uint8_t* IthoCC1101::getMessageCommandBytes(IthoCommand command)
-{
-  switch (command)
-  {
-    case IthoStandby:
-      return (uint8_t*)&ithoMessageStandByCommandBytes[0];
-    case IthoHigh:
-      return (uint8_t*)&ithoMessageHighCommandBytes[0];
-    case IthoFull:
-      return (uint8_t*)&ithoMessageFullCommandBytes[0];
-    case IthoMedium:
-      return (uint8_t*)&ithoMessageMediumCommandBytes[0];
-    case IthoLow:
-      return (uint8_t*)&ithoMessageLowCommandBytes[0];
-    case IthoTimer1:
-      return (uint8_t*)&ithoMessageTimer1CommandBytes[0];
-    case IthoTimer2:
-      return (uint8_t*)&ithoMessageTimer2CommandBytes[0];
-    case IthoTimer3:
-      return (uint8_t*)&ithoMessageTimer3CommandBytes[0];
-    case IthoJoin:
-      return (uint8_t*)&ithoMessageJoinCommandBytes[0];
-    case IthoLeave:
-      return (uint8_t*)&ithoMessageLeaveCommandBytes[0];
-    default:
-      return (uint8_t*)&ithoMessageLowCommandBytes[0];
-  }
-}
+// uint8_t* Orcon::getMessageCommandBytes(IthoCommand command)
+// {
+//   switch (command)
+//   {
+//     case IthoStandby:
+//       return (uint8_t*)&ithoMessageStandByCommandBytes[0];
+//     case IthoHigh:
+//       return (uint8_t*)&ithoMessageHighCommandBytes[0];
+//     case IthoFull:
+//       return (uint8_t*)&ithoMessageFullCommandBytes[0];
+//     case IthoMedium:
+//       return (uint8_t*)&ithoMessageMediumCommandBytes[0];
+//     case IthoLow:
+//       return (uint8_t*)&ithoMessageLowCommandBytes[0];
+//     case IthoTimer1:
+//       return (uint8_t*)&ithoMessageTimer1CommandBytes[0];
+//     case IthoTimer2:
+//       return (uint8_t*)&ithoMessageTimer2CommandBytes[0];
+//     case IthoTimer3:
+//       return (uint8_t*)&ithoMessageTimer3CommandBytes[0];
+//     case IthoJoin:
+//       return (uint8_t*)&ithoMessageJoinCommandBytes[0];
+//     case IthoLeave:
+//       return (uint8_t*)&ithoMessageLeaveCommandBytes[0];
+//     default:
+//       return (uint8_t*)&ithoMessageLowCommandBytes[0];
+//   }
+// }
 
 /*
    Counter2 is the decimal sum of all bytes in decoded form from
@@ -730,7 +730,7 @@ uint8_t* IthoCC1101::getMessageCommandBytes(IthoCommand command)
    from zero.
 */
 /*
-uint8_t IthoCC1101::getCounter2(IthoPacket *itho, uint8_t len) {
+uint8_t Orcon::getCounter2(RAMSESMessage *itho, uint8_t len) {
 
   uint8_t val = 0;
 
@@ -742,7 +742,7 @@ uint8_t IthoCC1101::getCounter2(IthoPacket *itho, uint8_t len) {
 }
 */
 
-uint8_t IthoCC1101::messageEncode(IthoPacket *itho, CC1101Packet *packet) {
+uint8_t Orcon::messageEncode(RAMSESMessage *itho, CC1101Packet *packet) {
 
 /*
   uint8_t lenOutbuf = 0;
@@ -853,7 +853,7 @@ static int decode_10to8(uint8_t const *b, int pos, int end, uint8_t *out)
     return 10;
 }
 
-int IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
+int Orcon::messageDecode(CC1101Packet *packet, RAMSESMessage *itho) {
   // create a bit buffer
   // TODO: view?
   bitbuffer_t bitbuffer = {0};
@@ -933,7 +933,7 @@ int IthoCC1101::messageDecode(CC1101Packet *packet, IthoPacket *itho) {
   return 1;
 }
 
-uint8_t IthoCC1101::ReadRSSI()
+uint8_t Orcon::ReadRSSI()
 {
   uint8_t rssi = 0;
   uint8_t value = 0;
@@ -954,24 +954,24 @@ uint8_t IthoCC1101::ReadRSSI()
   return (value);
 }
 
-// String IthoCC1101::getLastIDstr(bool ashex) const {
+// String Orcon::getLastIDstr(bool ashex) const {
 //   String str;
 //   for (uint8_t i = 0; i < 3; i++) {
-//     if (ashex) str += String(inIthoPacket.deviceId[i], HEX);
-//     else str += String(inIthoPacket.deviceId[i]);
+//     if (ashex) str += String(inOrconMessage.deviceId[i], HEX);
+//     else str += String(inOrconMessage.deviceId[i]);
 //     if (i < 2) str += ",";
 //   }
 //   return str;
 // }
 
-// int * IthoCC1101::getLastID() const {
+// int * Orcon::getLastID() const {
 //   static int id[3];
 //   for (uint8_t i = 0; i < 3; i++) {
-//     id[i] = inIthoPacket.deviceId[i];
+//     id[i] = inOrconMessage.deviceId[i];
 //   }
 //   return id;
 // }
 
-CC1101Packet IthoCC1101::getLastMessage() const {
+CC1101Packet Orcon::getLastPacket() const {
   return inMessage;
 }
