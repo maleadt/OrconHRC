@@ -275,8 +275,20 @@ void  IthoCC1101::initReceiveMessage()
 }
 
 bool IthoCC1101::checkForNewPacket() {
-  if (receiveData(&inMessage, 63) && parseMessageCommand()) {
-    initReceiveMessage();
+  if (receiveData(&inMessage, 63) && decodeMessage() > 0) {
+    int err = parseMessage();
+    if (err <= 0) {
+      Serial.printf("Parse error: %d\n", err);
+      return false;
+    }
+
+    err = interpretMessage();
+    if (err <= 0) {
+      Serial.printf("Interpret error: %d\n", err);
+      return false;
+    }
+
+    //initReceiveMessage(); // TODO: this shouldn't be needed?
     return true;
   }
   return false;
@@ -313,17 +325,21 @@ static uint8_t next(const uint8_t *bb, unsigned *ipos, unsigned num_bytes)
     return r;
 }
 
-bool IthoCC1101::parseMessageCommand() {
+int IthoCC1101::decodeMessage() {
   bitbuffer_clear(&inIthoPacket.bits);
 
   int pr = messageDecode(&inMessage, &inIthoPacket);
   if (pr <= 0)
-    return false;
+    return pr;
 
+  return 1;
+}
+
+int IthoCC1101::parseMessage() {
   // TODO: only populate IthoPacket here; shouldn't contain the bits
   bitbuffer_t *bmsg = &inIthoPacket.bits;
   IthoPacket *msg = &inIthoPacket;
-  const int row = 1;
+  const int row = 0;
 
   if (!bmsg || row >= bmsg->num_rows || bmsg->bits_per_row[row] < 8)
     return DECODE_ABORT_LENGTH;
@@ -367,94 +383,101 @@ bool IthoCC1101::parseMessageCommand() {
         bitbuffer_extract_bytes(bmsg, row, ipos, msg->unparsed, num_unparsed_bits);
   }
 
-  // TODO: return ipos instead of true?
-
-  // old
-
-  /*
-
-  //deviceType of message type?
-  inIthoPacket.deviceType  = inIthoPacket.dataDecoded[0];
-
-  //deviceID
-  inIthoPacket.deviceId[0] = inIthoPacket.dataDecoded[1];
-  inIthoPacket.deviceId[1] = inIthoPacket.dataDecoded[2];
-  inIthoPacket.deviceId[2] = inIthoPacket.dataDecoded[3];
-
-  //counter1
-  inIthoPacket.counter = inIthoPacket.dataDecoded[4];
-
-  bool isHighCommand      = checkIthoCommand(&inIthoPacket, ithoMessageHighCommandBytes);
-  bool isRVHighCommand    = checkIthoCommand(&inIthoPacket, ithoMessageRVHighCommandBytes);
-  bool isMediumCommand    = checkIthoCommand(&inIthoPacket, ithoMessageMediumCommandBytes);
-  bool isRVMediumCommand  = checkIthoCommand(&inIthoPacket, ithoMessageRVMediumCommandBytes);
-  bool isLowCommand       = checkIthoCommand(&inIthoPacket, ithoMessageLowCommandBytes);
-  bool isRVLowCommand     = checkIthoCommand(&inIthoPacket, ithoMessageRVLowCommandBytes);
-  bool isRVAutoCommand    = checkIthoCommand(&inIthoPacket, ithoMessageRVAutoCommandBytes);
-  bool isStandByCommand   = checkIthoCommand(&inIthoPacket, ithoMessageStandByCommandBytes);
-  bool isTimer1Command    = checkIthoCommand(&inIthoPacket, ithoMessageTimer1CommandBytes);
-  bool isTimer2Command    = checkIthoCommand(&inIthoPacket, ithoMessageTimer2CommandBytes);
-  bool isTimer3Command    = checkIthoCommand(&inIthoPacket, ithoMessageTimer3CommandBytes);
-  bool isJoinCommand      = checkIthoCommand(&inIthoPacket, ithoMessageJoinCommandBytes);
-  bool isJoin2Command     = checkIthoCommand(&inIthoPacket, ithoMessageJoin2CommandBytes);
-  bool isRVJoinCommand    = checkIthoCommand(&inIthoPacket, ithoMessageRVJoinCommandBytes);
-  bool isLeaveCommand     = checkIthoCommand(&inIthoPacket, ithoMessageLeaveCommandBytes);
-
-  //determine command
-  inIthoPacket.command = IthoUnknown;
-  if (isHighCommand)     inIthoPacket.command = IthoHigh;
-  if (isRVHighCommand)   inIthoPacket.command = IthoHigh;
-  if (isMediumCommand)   inIthoPacket.command = IthoMedium;
-  if (isRVMediumCommand) inIthoPacket.command = IthoMedium;
-  if (isLowCommand)      inIthoPacket.command = IthoLow;
-  if (isRVLowCommand)    inIthoPacket.command = IthoLow;
-  if (isRVAutoCommand)   inIthoPacket.command = IthoStandby;
-  if (isStandByCommand)  inIthoPacket.command = IthoStandby;
-  if (isTimer1Command)   inIthoPacket.command = IthoTimer1;
-  if (isTimer2Command)   inIthoPacket.command = IthoTimer2;
-  if (isTimer3Command)   inIthoPacket.command = IthoTimer3;
-  if (isJoinCommand)     inIthoPacket.command = IthoJoin;
-  if (isJoin2Command)    inIthoPacket.command = IthoJoin;
-  if (isRVJoinCommand)   inIthoPacket.command = IthoJoin;
-  if (isLeaveCommand)    inIthoPacket.command = IthoLeave;
-
-#if defined (CRC_FILTER)
-  uint8_t mLen = 0;
-  if (isPowerCommand || isHighCommand || isMediumCommand || isLowCommand || isStandByCommand || isTimer1Command || isTimer2Command || isTimer3Command) {
-    mLen = 11;
-  }
-  else if (isJoinCommand || isJoin2Command) {
-    mLen = 20;
-  }
-  else if (isLeaveCommand) {
-    mLen = 14;
-  }
-  else {
-    return true;
-  }
-  if (getCounter2(&inIthoPacket, mLen) != inIthoPacket.dataDecoded[mLen]) {
-    inIthoPacket.command = IthoUnknown;
-    return false;
-  }
-#endif
-
-*/
-
-  return true;
+  return ipos;
 }
 
-// bool IthoCC1101::checkIthoCommand(IthoPacket *itho, const uint8_t commandBytes[]) {
-//   uint8_t offset = 0;
-//   if (itho->deviceType == 28 || itho->deviceType == 24) offset = 2;
-//   for (int i = 4; i < 6; i++)
-//   {
-//     //if (i == 2 || i == 3) continue; //skip byte3 and byte4, rft-rv and co2-auto remote device seem to sometimes have a different number there
-//     if ( (itho->dataDecoded[i + 5 + offset] != commandBytes[i]) && (itho->dataDecodedChk[i + 5 + offset] != commandBytes[i]) ) {
-//       return false;
-//     }
-//   }
-//   return true;
-// }
+enum fan_setting {
+    FAN_AWAY = 0,
+    FAN_1 = 1,
+    FAN_2 = 2,
+    FAN_3 = 3,
+    FAN_AUTO = 4
+};
+
+int IthoCC1101::interpretMessage() {
+  Serial.println("IthoCC1101::interpretMessage");
+  bitbuffer_t *bmsg = &inIthoPacket.bits;
+  IthoPacket *msg = &inIthoPacket;
+  const int row = 0;
+
+  Serial.printf("- num_device_ids: %d\n", inIthoPacket.num_device_ids);
+  for (unsigned i = 0; i < msg->num_device_ids; i++) {
+      Serial.printf("  %02x%02x%02x\n",
+                    msg->device_id[i][0],
+                    msg->device_id[i][1],
+                    msg->device_id[i][2]);
+  }
+
+  Serial.printf("- command: 0x%04x\n", msg->command);
+  switch (msg->command) {
+    case 0x22f1: {
+        if (msg->payload_length != 3)
+          return -1;
+        if (msg->payload[0] != 0)
+          return -1;
+        if (msg->payload[2] != 4)
+          return -1;
+        switch (msg->payload[1]) {
+        case 0:
+            Serial.printf("  fan_setting: away\n");
+            break;
+        case 4:
+            Serial.printf("  fan_setting: auto\n");
+            break;
+        default:
+            Serial.printf("  fan_setting: %d\n", msg->payload[1]);
+        }
+        break;
+    }
+    case 0x22f3: {
+        if (msg->payload_length != 7)
+          return -1;
+        if (msg->payload[0] != 0)
+          return -1;
+        if (msg->payload[1] != 2)
+          return -1;
+        Serial.printf("  fan_timer_minutes: %d\n", msg->payload[2]);
+        switch (msg->payload[3]) {
+        case 0:
+            Serial.printf("  fan_setting: away\n");
+            break;
+        case 4:
+            Serial.printf("  fan_setting: auto\n");
+            break;
+        default:
+            Serial.printf("  fan_setting: %d\n", msg->payload[3]);
+        }
+        switch (msg->payload[4]) {
+        case 0:
+            Serial.printf("  fan_return_setting: away\n");
+            break;
+        case 4:
+            Serial.printf("  fan_return_setting: auto\n");
+            break;
+        default:
+            Serial.printf("  fan_return_setting: %d\n", msg->payload[4]);
+        }
+        break;
+    }
+    case 0x31d9: {
+        if (msg->payload_length != 4)
+          return -1;
+        switch (msg->payload[2]) {
+        case 0:
+            Serial.printf("  fan_set_to: away\n");
+            break;
+        case 4:
+            Serial.printf("  fan_set_to: auto\n");
+            break;
+        default:
+            Serial.printf("  fan_set_to: %d", msg->payload[2]);
+        }
+        break;
+    }
+  }
+
+  return 1;
+}
 
 void IthoCC1101::sendCommand(IthoCommand command)
 {
