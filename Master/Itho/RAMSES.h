@@ -53,19 +53,19 @@ class Orcon : protected CC1101
     // initialization
     void init() { CC1101::init(); initReceive(); }                    //init,reset CC1101
     void initReceive();
-    // uint8_t getLastCounter() { return outIthoPacket.counter; }        //counter is increased before sending a command
+    // uint8_t getLastCounter() { return outMessage.counter; }        //counter is increased before sending a command
     void setSendTries(uint8_t sendTries) { this->sendTries = sendTries; }
-    // void setDeviceID(uint8_t byte0, uint8_t byte1, uint8_t byte2) { this->outIthoPacket.deviceId[0] = byte0; this->outIthoPacket.deviceId[1] = byte1; this->outIthoPacket.deviceId[2] = byte2;}
+    // void setDeviceID(uint8_t byte0, uint8_t byte1, uint8_t byte2) { this->outMessage.deviceId[0] = byte0; this->outMessage.deviceId[1] = byte1; this->outMessage.deviceId[2] = byte2;}
 
     // receiving
     bool checkForNewPacket();                       //check RX fifo for new data
-    RAMSESMessage getLastMessage() const { return inOrconMessage; }           //retrieve last received/parsed packet from remote
-    // IthoCommand getLastCommand() const { return inOrconMessage.command; }           //retrieve last received/parsed command from remote
-    // uint8_t getLastInCounter() const { return inOrconMessage.counter; }           //retrieve last received/parsed command from remote
+    // RAMSESMessage getLastMessage() const { return inMessage; }           //retrieve last received/parsed packet from remote
+    // IthoCommand getLastCommand() const { return inMessage.command; }           //retrieve last received/parsed command from remote
+    // uint8_t getLastInCounter() const { return inMessage.counter; }           //retrieve last received/parsed command from remote
     // int * getLastID() const;
     // String getLastIDstr(bool ashex=true) const;
-    CC1101Packet getLastPacket() const;
-    String LastMessageDecoded() const;
+    // CC1101Packet getLastPacket() const;
+    // String LastMessageDecoded() const;
 
     // sending
     // void sendCommand(IthoCommand command);
@@ -85,9 +85,8 @@ class Orcon : protected CC1101
     void finishTransfer();
 
     //parse received message
-    int decodeMessage();
-    int parseMessage();
-    int interpretMessage();
+    int messageParse(RAMSESMessage *msg);
+    int messageInterpret(const RAMSESMessage *msg);
     // bool checkIthoCommand(RAMSESMessage *itho, const uint8_t commandBytes[]);
 
     // sending
@@ -98,15 +97,11 @@ class Orcon : protected CC1101
     // uint8_t* getMessageCommandBytes(IthoCommand command);
     uint8_t getCounter2(RAMSESMessage *itho, uint8_t len);
 
-    uint8_t messageEncode(RAMSESMessage *itho, CC1101Packet *packet);
-    int messageDecode(CC1101Packet *packet, RAMSESMessage *itho);
-
-    //receive
-    CC1101Packet inMessage;                       //temp storage message2
-    RAMSESMessage inOrconMessage;                        //stores last received message data
+    uint8_t messageEncode(const RAMSESMessage *itho, CC1101Packet *packet);
+    int messageDecode(const CC1101Packet *packet, RAMSESMessage *itho);
 
     //send
-    RAMSESMessage outIthoPacket;                       //stores state of "remote"
+    RAMSESMessage outMessage;                       //stores state of "remote"
 
     //settings
     uint8_t sendTries;                            //number of times a command is send at one button press

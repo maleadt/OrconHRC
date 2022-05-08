@@ -63,10 +63,6 @@ bool has_packet = false;
 void loop(void) {
   // if (has_packet) {
     if (rf.checkForNewPacket()) {
-      // IthoCommand cmd = rf.getLastCommand();
-      //if ((cmd != IthoUnknown)) {  // only act on good cmd
-        showPacket(rf);
-      //}
       has_packet = false;
     }
   // }
@@ -85,11 +81,4 @@ const char *int_to_binary_str(int x, int N_bits){
       *p++ = (x & (1<<i)) ? '1' : '0';
     }
     return b;
-}
-
-void showPacket(const Orcon &rf) { // TODO: const
-  RAMSESMessage message = rf.getLastMessage();
-  CC1101Packet packet = rf.getLastPacket();
-
-  Serial.println();
 }

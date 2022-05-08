@@ -43,14 +43,14 @@
 // default constructor
 Orcon::Orcon(uint8_t counter, uint8_t sendTries) : CC1101()
 {
-  // this->outIthoPacket.counter = counter;
+  // this->outMessage.counter = counter;
   // this->sendTries = sendTries;
 
-  // this->outIthoPacket.deviceId[0] = 33;
-  // this->outIthoPacket.deviceId[1] = 66;
-  // this->outIthoPacket.deviceId[2] = 99;
+  // this->outMessage.deviceId[0] = 33;
+  // this->outMessage.deviceId[1] = 66;
+  // this->outMessage.deviceId[2] = 99;
 
-  // this->outIthoPacket.deviceType = 22;
+  // this->outMessage.deviceType = 22;
 
 } //Orcon
 
@@ -275,20 +275,23 @@ void  Orcon::initReceiveMessage()
 }
 
 bool Orcon::checkForNewPacket() {
-  if (receiveData(&inMessage, 63) && decodeMessage() > 0) {
-    int err = parseMessage();
+  CC1101Packet inPacket;
+  RAMSESMessage inMessage;
+
+  if (receiveData(&inPacket, 63) && messageDecode(&inPacket, &inMessage) > 0) {
+    int err = messageParse(&inMessage);
     if (err <= 0) {
       Serial.printf("Parse error: %d\n", err);
       return false;
     }
 
-    err = interpretMessage();
+    err = messageInterpret(&inMessage);
     if (err <= 0) {
       Serial.printf("Interpret error: %d\n", err);
       return false;
     }
 
-    //initReceiveMessage(); // TODO: this shouldn't be needed?
+    // initReceiveMessage(); // TODO: this shouldn't be needed?
     return true;
   }
   return false;
@@ -325,20 +328,9 @@ static uint8_t next(const uint8_t *bb, unsigned *ipos, unsigned num_bytes)
     return r;
 }
 
-int Orcon::decodeMessage() {
-  bitbuffer_clear(&inOrconMessage.bits);
-
-  int pr = messageDecode(&inMessage, &inOrconMessage);
-  if (pr <= 0)
-    return pr;
-
-  return 1;
-}
-
-int Orcon::parseMessage() {
+int Orcon::messageParse(RAMSESMessage *msg) {
   // TODO: only populate Message here; shouldn't contain the bits
-  bitbuffer_t *bmsg = &inOrconMessage.bits;
-  RAMSESMessage *msg = &inOrconMessage;
+  bitbuffer_t *bmsg = &msg->bits;
   const int row = 0;
 
   if (!bmsg || row >= bmsg->num_rows || bmsg->bits_per_row[row] < 8)
@@ -394,13 +386,12 @@ enum fan_setting {
     FAN_AUTO = 4
 };
 
-int Orcon::interpretMessage() {
-  Serial.println("Orcon::interpretMessage");
-  bitbuffer_t *bmsg = &inOrconMessage.bits;
-  RAMSESMessage *msg = &inOrconMessage;
+int Orcon::messageInterpret(const RAMSESMessage *msg) {
+  Serial.println("Orcon::messageInterpret");
+  const bitbuffer_t *bmsg = &msg->bits;
   const int row = 0;
 
-  Serial.printf("- num_device_ids: %d\n", inOrconMessage.num_device_ids);
+  Serial.printf("- num_device_ids: %d\n", msg->num_device_ids);
   for (unsigned i = 0; i < msg->num_device_ids; i++) {
       Serial.printf("  %02x%02x%02x\n",
                     msg->device_id[i][0],
@@ -470,7 +461,7 @@ int Orcon::interpretMessage() {
             Serial.printf("  fan_set_to: auto\n");
             break;
         default:
-            Serial.printf("  fan_set_to: %d", msg->payload[2]);
+            Serial.printf("  fan_set_to: %d\n", msg->payload[2]);
         }
         break;
     }
@@ -488,25 +479,25 @@ int Orcon::interpretMessage() {
 //   /*
 
 //   //update itho packet data
-//   outIthoPacket.command = command;
-//   outIthoPacket.counter += 1;
+//   outMessage.command = command;
+//   outMessage.counter += 1;
 
 //   //get message2 bytes
 //   switch (command)
 //   {
 //     case IthoJoin:
-//       createMessageJoin(&outIthoPacket, &outMessage);
+//       createMessageJoin(&outMessage, &outMessage);
 //       break;
 
 //     case IthoLeave:
-//       createMessageLeave(&outIthoPacket, &outMessage);
+//       createMessageLeave(&outMessage, &outMessage);
 //       //the leave command needs to be transmitted for 1 second according the manual
 //       maxTries = 30;
 //       delaytime = 4;
 //       break;
 
 //     default:
-//       createMessageCommand(&outIthoPacket, &outMessage);
+//       createMessageCommand(&outMessage, &outMessage);
 //       break;
 //   }
 
@@ -742,7 +733,7 @@ uint8_t Orcon::getCounter2(RAMSESMessage *itho, uint8_t len) {
 }
 */
 
-uint8_t Orcon::messageEncode(RAMSESMessage *itho, CC1101Packet *packet) {
+uint8_t Orcon::messageEncode(const RAMSESMessage *itho, CC1101Packet *packet) {
 
 /*
   uint8_t lenOutbuf = 0;
@@ -853,7 +844,7 @@ static int decode_10to8(uint8_t const *b, int pos, int end, uint8_t *out)
     return 10;
 }
 
-int Orcon::messageDecode(CC1101Packet *packet, RAMSESMessage *itho) {
+int Orcon::messageDecode(const CC1101Packet *packet, RAMSESMessage *msg) {
   // create a bit buffer
   // TODO: view?
   bitbuffer_t bitbuffer = {0};
@@ -862,6 +853,9 @@ int Orcon::messageDecode(CC1101Packet *packet, RAMSESMessage *itho) {
       bitbuffer_add_bit(&bitbuffer, packet->data[i] >> j & 0b01);
     }
   }
+
+  Serial.printf("raw packet: ");
+  bitbuffer_print(&bitbuffer);
 
   // preamble=0x55 0xFF 0x00
   // preamble with start/stop bits=0101010101 0111111111 0000000001
@@ -915,7 +909,8 @@ int Orcon::messageDecode(CC1101Packet *packet, RAMSESMessage *itho) {
   unsigned num_bits   = end_byte - first_byte;
   //unsigned num_bytes = num_bits/8 / 2;
 
-  unsigned fpos = bitbuffer_manchester_decode(&bytes, row, first_byte, &itho->bits, num_bits);
+  bitbuffer_clear(&msg->bits);
+  unsigned fpos = bitbuffer_manchester_decode(&bytes, row, first_byte, &msg->bits, num_bits);
   unsigned man_errors = num_bits - (fpos - first_byte - 2);
 
 #ifndef _DEBUG
@@ -923,12 +918,8 @@ int Orcon::messageDecode(CC1101Packet *packet, RAMSESMessage *itho) {
       return DECODE_FAIL_SANITY;
 #endif
 
-  Serial.printf("packet: ");
-  bitbuffer_print(&itho->bits);
-
-  // for compatibility (TODO: maintain bitbuffer everywhere?)
-  // bitbuffer_extract_bytes(&itho->bits, row, 0, itho->dataDecoded, num_bits);
-  // itho->length = itho->bits.bits_per_row[row] / 8;
+  Serial.printf("raw message: ");
+  bitbuffer_print(&msg->bits);
 
   return 1;
 }
@@ -957,8 +948,8 @@ uint8_t Orcon::ReadRSSI()
 // String Orcon::getLastIDstr(bool ashex) const {
 //   String str;
 //   for (uint8_t i = 0; i < 3; i++) {
-//     if (ashex) str += String(inOrconMessage.deviceId[i], HEX);
-//     else str += String(inOrconMessage.deviceId[i]);
+//     if (ashex) str += String(inMessage.deviceId[i], HEX);
+//     else str += String(inMessage.deviceId[i]);
 //     if (i < 2) str += ",";
 //   }
 //   return str;
@@ -967,11 +958,11 @@ uint8_t Orcon::ReadRSSI()
 // int * Orcon::getLastID() const {
 //   static int id[3];
 //   for (uint8_t i = 0; i < 3; i++) {
-//     id[i] = inOrconMessage.deviceId[i];
+//     id[i] = inMessage.deviceId[i];
 //   }
 //   return id;
 // }
 
-CC1101Packet Orcon::getLastPacket() const {
-  return inMessage;
-}
+// CC1101Packet Orcon::getLastPacket() const {
+//   return inPacket;
+// }
