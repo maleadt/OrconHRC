@@ -44,11 +44,11 @@ const uint8_t ithoMessageLeaveCommandBytes[] =    {31,201,6,0,31,201};
 //151,149,65,31,201,24,0,49,224,151,149,65,0,18,160,151,149,65,1,16,224
 
 
-class Orcon : protected CC1101
+class RAMSES : protected CC1101
 {
   public:
-    Orcon(uint8_t counter = 0, uint8_t sendTries = 3);   //set initial counter value
-    ~Orcon() {};
+    RAMSES(uint8_t counter = 0, uint8_t sendTries = 3);   //set initial counter value
+    ~RAMSES() {};
 
     // initialization
     void init() { CC1101::init(); initReceive(); }                    //init,reset CC1101
@@ -74,8 +74,8 @@ class Orcon : protected CC1101
     uint8_t ReadRSSI();
 
   private:
-    Orcon( const Orcon &c);
-    Orcon& operator=( const Orcon &c);
+    RAMSES( const RAMSES &c);
+    RAMSES& operator=( const RAMSES &c);
 
     //init CC1101 for receiving
     void initReceiveMessage();
@@ -106,6 +106,6 @@ class Orcon : protected CC1101
     //settings
     uint8_t sendTries;                            //number of times a command is send at one button press
 
-}; //Orcon
+}; //RAMSES
 
 #endif //__ITHOCC1101_H__

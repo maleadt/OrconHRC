@@ -37,10 +37,10 @@
 
 #define ITHO_IRQ_PIN 22 // pin 17 / D22
 
-Orcon rf;
+RAMSES rf;
 
 ICACHE_RAM_ATTR void ITHOcheck();
-void showPacket(const Orcon &rf);
+void showPacket(const RAMSES &rf);
 
 void setup(void) {
   Serial.begin(115200);

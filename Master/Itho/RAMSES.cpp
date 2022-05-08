@@ -41,7 +41,7 @@
 // #define MDMCFG2 0x02 //16bit sync word / 16bit specific
 
 // default constructor
-Orcon::Orcon(uint8_t counter, uint8_t sendTries) : CC1101()
+RAMSES::RAMSES(uint8_t counter, uint8_t sendTries) : CC1101()
 {
   // this->outMessage.counter = counter;
   // this->sendTries = sendTries;
@@ -52,9 +52,9 @@ Orcon::Orcon(uint8_t counter, uint8_t sendTries) : CC1101()
 
   // this->outMessage.deviceType = 22;
 
-} //Orcon
+} //RAMSES
 
-void Orcon::initSendMessage(uint8_t len)
+void RAMSES::initSendMessage(uint8_t len)
 {
   //finishTransfer();
   writeCommand(CC1101_SIDLE);
@@ -141,7 +141,7 @@ void Orcon::initSendMessage(uint8_t len)
 
 }
 
-void Orcon::finishTransfer()
+void RAMSES::finishTransfer()
 {
   writeCommand(CC1101_SIDLE);
   delayMicroseconds(1);
@@ -153,7 +153,7 @@ void Orcon::finishTransfer()
   writeCommand(CC1101_SPWD);
 }
 
-void Orcon::initReceive()
+void RAMSES::initReceive()
 {
   /*
     Configuration reverse engineered from RFT print.
@@ -243,7 +243,7 @@ void Orcon::initReceive()
   initReceiveMessage();
 }
 
-void  Orcon::initReceiveMessage()
+void  RAMSES::initReceiveMessage()
 {
   uint8_t marcState;
 
@@ -274,7 +274,7 @@ void  Orcon::initReceiveMessage()
   }
 }
 
-bool Orcon::checkForNewPacket() {
+bool RAMSES::checkForNewPacket() {
   CC1101Packet inPacket;
   RAMSESMessage inMessage;
 
@@ -328,7 +328,7 @@ static uint8_t next(const uint8_t *bb, unsigned *ipos, unsigned num_bytes)
     return r;
 }
 
-int Orcon::messageParse(RAMSESMessage *msg) {
+int RAMSES::messageParse(RAMSESMessage *msg) {
   // TODO: only populate Message here; shouldn't contain the bits
   bitbuffer_t *bmsg = &msg->bits;
   const int row = 0;
@@ -386,8 +386,8 @@ enum fan_setting {
     FAN_AUTO = 4
 };
 
-int Orcon::messageInterpret(const RAMSESMessage *msg) {
-  Serial.println("Orcon::messageInterpret");
+int RAMSES::messageInterpret(const RAMSESMessage *msg) {
+  Serial.println("RAMSES::messageInterpret");
   const bitbuffer_t *bmsg = &msg->bits;
   const int row = 0;
 
@@ -470,7 +470,7 @@ int Orcon::messageInterpret(const RAMSESMessage *msg) {
   return 1;
 }
 
-// void Orcon::sendCommand(IthoCommand command)
+// void RAMSES::sendCommand(IthoCommand command)
 // {
 //   CC1101Packet outMessage;
 //   uint8_t maxTries = sendTries;
@@ -518,7 +518,7 @@ int Orcon::messageInterpret(const RAMSESMessage *msg) {
 // }
 
 
-void Orcon::createMessageStart(RAMSESMessage *itho, CC1101Packet *packet)
+void RAMSES::createMessageStart(RAMSESMessage *itho, CC1101Packet *packet)
 {
 
   //fixed, set start structure in data buffer manually
@@ -537,7 +537,7 @@ void Orcon::createMessageStart(RAMSESMessage *itho, CC1101Packet *packet)
 
 }
 
-void Orcon::createMessageCommand(RAMSESMessage *itho, CC1101Packet *packet)
+void RAMSES::createMessageCommand(RAMSESMessage *itho, CC1101Packet *packet)
 {
 /*
   //set start message structure
@@ -581,7 +581,7 @@ void Orcon::createMessageCommand(RAMSESMessage *itho, CC1101Packet *packet)
 
 }
 
-void Orcon::createMessageJoin(RAMSESMessage *itho, CC1101Packet *packet)
+void RAMSES::createMessageJoin(RAMSESMessage *itho, CC1101Packet *packet)
 {
 /*
   //set start message structure
@@ -638,7 +638,7 @@ void Orcon::createMessageJoin(RAMSESMessage *itho, CC1101Packet *packet)
 */
 }
 
-void Orcon::createMessageLeave(RAMSESMessage *itho, CC1101Packet *packet)
+void RAMSES::createMessageLeave(RAMSESMessage *itho, CC1101Packet *packet)
 {
 /*
   //set start message structure
@@ -686,7 +686,7 @@ void Orcon::createMessageLeave(RAMSESMessage *itho, CC1101Packet *packet)
 */
 }
 
-// uint8_t* Orcon::getMessageCommandBytes(IthoCommand command)
+// uint8_t* RAMSES::getMessageCommandBytes(IthoCommand command)
 // {
 //   switch (command)
 //   {
@@ -721,7 +721,7 @@ void Orcon::createMessageLeave(RAMSESMessage *itho, CC1101Packet *packet)
    from zero.
 */
 /*
-uint8_t Orcon::getCounter2(RAMSESMessage *itho, uint8_t len) {
+uint8_t RAMSES::getCounter2(RAMSESMessage *itho, uint8_t len) {
 
   uint8_t val = 0;
 
@@ -733,7 +733,7 @@ uint8_t Orcon::getCounter2(RAMSESMessage *itho, uint8_t len) {
 }
 */
 
-uint8_t Orcon::messageEncode(const RAMSESMessage *itho, CC1101Packet *packet) {
+uint8_t RAMSES::messageEncode(const RAMSESMessage *itho, CC1101Packet *packet) {
 
 /*
   uint8_t lenOutbuf = 0;
@@ -844,7 +844,7 @@ static int decode_10to8(uint8_t const *b, int pos, int end, uint8_t *out)
     return 10;
 }
 
-int Orcon::messageDecode(const CC1101Packet *packet, RAMSESMessage *msg) {
+int RAMSES::messageDecode(const CC1101Packet *packet, RAMSESMessage *msg) {
   // create a bit buffer
   // TODO: view?
   bitbuffer_t bitbuffer = {0};
@@ -924,7 +924,7 @@ int Orcon::messageDecode(const CC1101Packet *packet, RAMSESMessage *msg) {
   return 1;
 }
 
-uint8_t Orcon::ReadRSSI()
+uint8_t RAMSES::ReadRSSI()
 {
   uint8_t rssi = 0;
   uint8_t value = 0;
@@ -945,7 +945,7 @@ uint8_t Orcon::ReadRSSI()
   return (value);
 }
 
-// String Orcon::getLastIDstr(bool ashex) const {
+// String RAMSES::getLastIDstr(bool ashex) const {
 //   String str;
 //   for (uint8_t i = 0; i < 3; i++) {
 //     if (ashex) str += String(inMessage.deviceId[i], HEX);
@@ -955,7 +955,7 @@ uint8_t Orcon::ReadRSSI()
 //   return str;
 // }
 
-// int * Orcon::getLastID() const {
+// int * RAMSES::getLastID() const {
 //   static int id[3];
 //   for (uint8_t i = 0; i < 3; i++) {
 //     id[i] = inMessage.deviceId[i];
@@ -963,6 +963,6 @@ uint8_t Orcon::ReadRSSI()
 //   return id;
 // }
 
-// CC1101Packet Orcon::getLastPacket() const {
+// CC1101Packet RAMSES::getLastPacket() const {
 //   return inPacket;
 // }
